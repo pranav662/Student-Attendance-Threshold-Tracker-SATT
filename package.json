@@ -1,0 +1,25 @@
+{
+  "name": "sams",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "check": "node --check server.js && node --check update_passwords.js",
+    "seed:passwords": "node update_passwords.js",
+    "start": "node server.js",
+    "stop": "taskkill /F /IM node.exe"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^18.0.0",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "mysql2": "^3.24.4",
+    "pdfkit": "^0.20.2"
+  }
+}

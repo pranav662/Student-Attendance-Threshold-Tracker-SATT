@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — SAMS</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app-shell">
+
+    <!-- ═══ SIDEBAR ════════════════════════════════════════ -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-head">
+            <div class="sidebar-logo">S</div>
+            <div>
+                <div class="sidebar-title">SAMS</div>
+                <span class="sidebar-role">Administration</span>
+            </div>
+        </div>
+
+        <div class="sidebar-nav">
+            <div class="nav-group-label">Overview</div>
+            <button class="nav-item active" id="nav-overview" onclick="showSection('overview',this)">
+                <span class="nav-icon">🏛</span> Dashboard
+            </button>
+            <button class="nav-item" id="nav-approvals" onclick="showSection('approvals',this)">
+                <span class="nav-icon">✅</span> Approvals
+                <span class="nav-badge" id="pendingBadge" style="display:none;">0</span>
+            </button>
+
+            <div class="nav-group-label" style="margin-top:0.5rem;">Account</div>
+            <button class="nav-item" onclick="SAMS.logout()">
+                <span class="nav-icon">🚪</span> Sign Out
+            </button>
+        </div>
+
+        <div class="sidebar-foot">
+            <div class="user-pill">
+                <div class="user-av">A</div>
+                <div>
+                    <div class="user-name">Administrator</div>
+                    <div class="user-role-txt">Full system access</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══ MAIN ════════════════════════════════════════════ -->
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-info">
+                <h2 id="topbarTitle">Admin Dashboard</h2>
+                <p id="topbarSub">University attendance overview</p>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon" id="themeToggle" aria-label="Toggle theme">☀</button>
+            </div>
+        </header>
+
+        <div class="page">
+
+            <!-- ── Overview ── -->
+            <div id="section-overview">
+                <div class="page-head">
+                    <div class="eyebrow">University Operations</div>
+                    <h1>Attendance at a Glance</h1>
+                    <p>Live institutional data across all stakeholders.</p>
+                </div>
+
+                <!-- Stat tiles -->
+                <div class="g4" style="margin-bottom:1.5rem;">
+                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#38BDF8,#6366F1);--tile-icon-bg:rgba(56,189,248,0.12);">
+                        <div class="stat-icon">🎓</div>
+                        <div class="stat-val skel" id="statStudents">—</div>
+                        <div class="stat-lbl">Enrolled Students</div>
+                        <div class="stat-note">Active learner profiles</div>
+                    </div>
+                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#6366F1,#A78BFA);--tile-icon-bg:rgba(99,102,241,0.12);">
+                        <div class="stat-icon">🧑‍🏫</div>
+                        <div class="stat-val skel" id="statFaculty">—</div>
+                        <div class="stat-lbl">Faculty Members</div>
+                        <div class="stat-note">Active teaching staff</div>
+                    </div>
+                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#10B981,#059669);--tile-icon-bg:rgba(16,185,129,0.12);">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-val skel" id="statCourses">—</div>
+                        <div class="stat-lbl">Active Courses</div>
+                        <div class="stat-note">In the catalogue</div>
+                    </div>
+                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#F59E0B,#D97706);--tile-icon-bg:rgba(245,158,11,0.12);">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-val skel" id="statPending">—</div>
+                        <div class="stat-lbl">Pending Approvals</div>
+                        <div class="stat-note">Teachers awaiting review</div>
+                    </div>
+                </div>
+
+                <!-- Quick actions -->
+                <div class="card">
+                    <div class="card-head">
+                        <div class="card-title">Quick Actions</div>
+                    </div>
+                    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                        <button class="btn btn-ghost" onclick="showSection('approvals', document.getElementById('nav-approvals'))">
+                            ✅ Review Pending Teachers
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Approvals ── -->
+            <div id="section-approvals" style="display:none;">
+                <div class="page-head">
+                    <div class="eyebrow">Faculty Management</div>
+                    <h1>Teacher Approvals</h1>
+                    <p>Review and approve or reject teacher registration requests below.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-head">
+                        <div class="section-head">
+                            <div class="section-title">
+                                <div class="section-icon">🧑‍🏫</div>
+                                Pending Requests
+                            </div>
+                        </div>
+                    </div>
+                    <div id="approvalList">
+                        <div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.page -->
+    </div><!-- /.main -->
+</div><!-- /.app-shell -->
+
+<script src="/app.js"></script>
+<script>
+(function() {
+    'use strict';
+    SAMS.initTheme();
+    SAMS.requireAuth();
+
+    /* ── Section navigation ── */
+    function showSection(name, navEl) {
+        document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
+        document.getElementById('section-' + name).style.display = 'block';
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        if (navEl) navEl.classList.add('active');
+        const titles = { overview:'Admin Dashboard', approvals:'Teacher Approvals' };
+        const subs   = { overview:'University attendance overview', approvals:'Manage faculty registration requests' };
+        document.getElementById('topbarTitle').textContent = titles[name] || name;
+        document.getElementById('topbarSub').textContent   = subs[name]  || '';
+        if (name === 'approvals') loadApprovals();
+    }
+    window.showSection = showSection;
+
+    /* ── Stats ── */
+    function animCount(id, target) {
+        const el = document.getElementById(id);
+        el.classList.remove('skel');
+        let n = 0;
+        const step = Math.max(1, Math.ceil(target / 40));
+        const t = setInterval(() => {
+            n = Math.min(n + step, target);
+            el.textContent = n.toLocaleString();
+            if (n >= target) clearInterval(t);
+        }, 18);
+    }
+
+    async function loadStats() {
+        try {
+            const res = await SAMS.apiFetch('/api/admin/stats');
+            if (!res.ok) return;
+            const d = await res.json();
+            animCount('statStudents', d.students || 0);
+            animCount('statFaculty',  d.faculty  || 0);
+            animCount('statCourses',  d.courses  || 0);
+            // pending count loaded by loadApprovals
+        } catch(e) {
+            ['statStudents','statFaculty','statCourses','statPending'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.classList.remove('skel'); el.textContent = '?'; }
+            });
+        }
+    }
+
+    /* ── Approvals ── */
+    async function loadApprovals() {
+        const list = document.getElementById('approvalList');
+        list.innerHTML = '<div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div>';
+        try {
+            const res      = await SAMS.apiFetch('/api/admin/pending-teachers');
+            const teachers = await res.json();
+
+            // Update pending stat + badge
+            const pend = document.getElementById('statPending');
+            const badg = document.getElementById('pendingBadge');
+            pend.classList.remove('skel');
+            pend.textContent = teachers.length;
+            if (teachers.length > 0) { badg.textContent = teachers.length; badg.style.display = ''; }
+            else { badg.style.display = 'none'; }
+
+            if (!teachers.length) {
+                list.innerHTML = '<div class="empty-state"><div class="ei">🎉</div><p>No pending approvals — all caught up!</p></div>';
+                return;
+            }
+
+            list.innerHTML = teachers.map(t => `
+                <div class="approval-card" id="app-${t.user_id}">
+                    <div class="app-avatar">${SAMS.escapeHTML(t.name.charAt(0).toUpperCase())}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="app-name">${SAMS.escapeHTML(t.name)}</div>
+                        <div class="app-email">${SAMS.escapeHTML(t.email)}</div>
+                    </div>
+                    <div class="app-actions">
+                        <button class="btn btn-success btn-sm" onclick="decide(${t.user_id},'approved')">Approve</button>
+                        <button class="btn btn-danger  btn-sm" onclick="decide(${t.user_id},'rejected')">Reject</button>
+                    </div>
+                </div>
+            `).join('') + '<div style="height:0.5rem;"></div>';
+        } catch(e) {
+            list.innerHTML = '<div class="empty-state"><p style="color:var(--danger)">Failed to load. Refresh the page.</p></div>';
+        }
+    }
+    window.loadApprovals = loadApprovals;
+
+    window.decide = async function(userId, status) {
+        try {
+            const res  = await SAMS.apiFetch(`/api/admin/approve-teacher/${userId}`, {
+                method:'PUT', body: JSON.stringify({ status })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                SAMS.toast(data.message, 'success');
+                document.getElementById('app-'+userId)?.remove();
+                loadStats();
+                loadApprovals();
+            } else { SAMS.toast(data.error || 'Failed.', 'error'); }
+        } catch(e) { SAMS.toast('Network error.', 'error'); }
+    };
+
+    loadStats();
+    loadApprovals();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile — SAMS</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app-shell">
+
+    <!-- ═══ SIDEBAR ════════════════════════════════════════ -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-head">
+            <div class="sidebar-logo">S</div>
+            <div>
+                <div class="sidebar-title">SAMS</div>
+                <span class="sidebar-role">My Profile</span>
+            </div>
+        </div>
+
+        <div class="sidebar-nav">
+            <div class="nav-group-label">Navigation</div>
+            <button class="nav-item" id="backBtn">
+                <span class="nav-icon">←</span> Back to Dashboard
+            </button>
+
+            <div class="nav-group-label" style="margin-top:0.5rem;">Profile</div>
+            <button class="nav-item active" onclick="showTab('details', this)">
+                <span class="nav-icon">👤</span> Personal Details
+            </button>
+            <button class="nav-item" onclick="showTab('security', this)">
+                <span class="nav-icon">🔒</span> Change Password
+            </button>
+            <button class="nav-item" onclick="showTab('picture', this)">
+                <span class="nav-icon">🖼</span> Profile Picture
+            </button>
+
+            <div class="nav-group-label" style="margin-top:0.5rem;">Account</div>
+            <button class="nav-item" onclick="SAMS.logout()">
+                <span class="nav-icon">🚪</span> Sign Out
+            </button>
+        </div>
+
+        <div class="sidebar-foot">
+            <div class="user-pill">
+                <div class="user-av" id="sidebarAv">?</div>
+                <div>
+                    <div class="user-name" id="sidebarName">Loading…</div>
+                    <div class="user-role-txt" id="sidebarRole">—</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══ MAIN ════════════════════════════════════════════ -->
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-info">
+                <h2>Profile Settings</h2>
+                <p>Manage your account, security, and picture</p>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon" id="themeToggle" aria-label="Toggle theme">☀</button>
+            </div>
+        </header>
+
+        <div class="page" style="max-width:760px;">
+
+            <!-- ── Avatar card ── -->
+            <div class="card" style="display:flex;align-items:center;gap:1.5rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+                <div class="profile-av" id="bigAvatar" onclick="showTab('picture', null)" title="Change photo">
+                    <span id="bigInitial">?</span>
+                    <div class="profile-av-overlay">📷</div>
+                </div>
+                <div>
+                    <div style="font-size:1.25rem;font-weight:800;color:var(--text-1);" id="dispName">Loading…</div>
+                    <div style="font-size:0.85rem;color:var(--text-3);margin-top:0.15rem;" id="dispEmail">—</div>
+                    <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <span class="badge badge-info" id="dispRole">—</span>
+                        <span class="badge badge-muted" id="dispStatus">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Tab nav ── -->
+            <div class="card">
+                <div class="profile-tabs">
+                    <button class="profile-tab active" data-tab="details"  onclick="showTab('details',  null)">Personal Details</button>
+                    <button class="profile-tab"         data-tab="security" onclick="showTab('security', null)">Change Password</button>
+                    <button class="profile-tab"         data-tab="picture"  onclick="showTab('picture',  null)">Profile Picture</button>
+                </div>
+
+                <!-- ── Details pane ── -->
+                <div class="profile-pane active" id="pane-details">
+                    <form id="detailsForm">
+                        <div class="form-group">
+                            <label class="form-label" for="fieldName">Full Name</label>
+                            <input class="form-input" id="fieldName" type="text" required placeholder="Your full name">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fieldEmail">Email Address</label>
+                            <input class="form-input" id="fieldEmail" type="email" required placeholder="you@university.edu">
+                        </div>
+                        <div style="display:flex;align-items:center;gap:1rem;margin-top:0.25rem;">
+                            <button type="submit" class="btn btn-primary" id="detailsBtn">Save Changes</button>
+                            <span class="saved-chip" id="detailsSaved">✓ Saved!</span>
+                        </div>
+                    </form>
+                    <div id="detailsNotice" class="notice"></div>
+                </div>
+
+                <!-- ── Security pane ── -->
+                <div class="profile-pane" id="pane-security">
+                    <div style="background:var(--info-bg);border:1px solid rgba(56,189,248,0.2);border-radius:var(--r-sm);padding:0.75rem 0.9rem;font-size:0.82rem;color:var(--info);margin-bottom:1.25rem;">
+                        🔒 Passwords are stored with bcrypt hashing — they cannot be recovered, only reset.
+                    </div>
+                    <form id="passwordForm">
+                        <div class="form-group">
+                            <label class="form-label" for="newPw">New Password</label>
+                            <div class="input-row">
+                                <input class="form-input" id="newPw" type="password"
+                                       placeholder="Min. 8 characters" minlength="8" required>
+                                <button type="button" class="input-toggle" data-for="newPw">Show</button>
+                            </div>
+                            <div class="pw-bar" id="pwBar"><span></span><span></span><span></span></div>
+                            <div class="form-hint" id="pwHint">Use 8+ characters with letters and numbers.</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="confirmPw">Confirm Password</label>
+                            <div class="input-row">
+                                <input class="form-input" id="confirmPw" type="password"
+                                       placeholder="Repeat new password" required>
+                                <button type="button" class="input-toggle" data-for="confirmPw">Show</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:1rem;margin-top:0.25rem;">
+                            <button type="submit" class="btn btn-primary" id="pwBtn">Update Password</button>
+                            <span class="saved-chip" id="pwSaved">✓ Updated!</span>
+                        </div>
+                    </form>
+                    <div id="pwNotice" class="notice"></div>
+                </div>
+
+                <!-- ── Picture pane ── -->
+                <div class="profile-pane" id="pane-picture">
+                    <!-- Preview -->
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:0.85rem;margin-bottom:1.5rem;">
+                        <div class="profile-av" id="previewAv" style="width:100px;height:100px;font-size:2.2rem;">
+                            <span id="previewInitial">?</span>
+                            <div class="profile-av-overlay">📷</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-weight:600;font-size:0.875rem;color:var(--text-1);">Profile Photo</div>
+                            <div style="font-size:0.75rem;color:var(--text-3);margin-top:0.2rem;">JPG, PNG or GIF · Max 5 MB</div>
+                        </div>
+                    </div>
+
+                    <form id="picForm">
+                        <label class="file-zone" for="picInput">
+                            <input type="file" id="picInput" accept="image/*" required>
+                            <div style="font-size:1.8rem;margin-bottom:0.4rem;">📁</div>
+                            <div style="font-weight:600;font-size:0.875rem;color:var(--text-2);">Click to choose a photo</div>
+                            <div class="form-hint" style="margin:0.3rem 0 0;" id="fileLabel">No file chosen</div>
+                        </label>
+                        <button type="submit" class="btn btn-primary btn-full" style="margin-top:0.85rem;">
+                            Upload Photo
+                        </button>
+                    </form>
+                    <div id="picNotice" class="notice"></div>
+                </div>
+            </div>
+
+        </div><!-- /.page -->
+    </div><!-- /.main -->
+</div><!-- /.app-shell -->
+
+<script src="/app.js"></script>
+<script>
+(function() {
+    'use strict';
+    SAMS.initTheme();
+    SAMS.requireAuth();
+
+    /* ── Back button ── */
+    document.getElementById('backBtn').addEventListener('click', () => {
+        if (document.referrer && document.referrer.includes(location.hostname)) {
+            history.back();
+        } else {
+            window.location.href = '/';
+        }
+    });
+
+    /* ── Tab switching ── */
+    function showTab(name, navEl) {
+        document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.profile-pane').forEach(p => p.classList.remove('active'));
+        document.querySelector(`[data-tab="${name}"]`)?.classList.add('active');
+        document.getElementById('pane-' + name).classList.add('active');
+        // Update sidebar
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        if (navEl) navEl.classList.add('active');
+    }
+    window.showTab = showTab;
+
+    /* ── Password toggles ── */
+    document.querySelectorAll('.input-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const inp = document.getElementById(btn.dataset.for);
+            const show = inp.type === 'text';
+            inp.type = show ? 'password' : 'text';
+            btn.textContent = show ? 'Show' : 'Hide';
+        });
+    });
+
+    /* ── Password strength ── */
+    document.getElementById('newPw').addEventListener('input', function() {
+        const v = this.value;
+        let s = 0;
+        if (v.length >= 8) s++;
+        if (/\d/.test(v) && /[a-zA-Z]/.test(v)) s++;
+        if (v.length >= 12 && /[^a-zA-Z0-9]/.test(v)) s++;
+        const bar  = document.getElementById('pwBar');
+        const hint = document.getElementById('pwHint');
+        bar.className = 'pw-bar' + (v ? ['',' weak',' fair',' strong'][s] : '');
+        hint.textContent = !v ? 'Use 8+ characters with letters and numbers.'
+            : s <= 1 ? '⚠ Weak — add numbers or a symbol.'
+            : s === 2 ? '~ Fair — make it a bit longer.'
+            : '✓ Strong password!';
+    });
+
+    /* ── File input label + preview ── */
+    document.getElementById('picInput').addEventListener('change', function() {
+        const file = this.files[0];
+        document.getElementById('fileLabel').textContent = file ? file.name : 'No file chosen';
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const prev = document.getElementById('previewAv');
+            prev.innerHTML = `<img src="${e.target.result}"><div class="profile-av-overlay">📷</div>`;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    /* ── Notice helper ── */
+    function setNotice(id, msg, type) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = 'notice show ' + type;
+    }
+
+    /* ── Flash saved ── */
+    function flashSaved(id) {
+        const el = document.getElementById(id);
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 2800);
+    }
+
+    /* ── Update header/sidebar from data ── */
+    function refreshHeader(data) {
+        const initial = (data.name || '?').charAt(0).toUpperCase();
+        // Sidebar
+        document.getElementById('sidebarName').textContent = data.name || '—';
+        document.getElementById('sidebarAv').textContent   = initial;
+        document.getElementById('sidebarRole').textContent = (data.role || '').replace(/\b\w/g, c => c.toUpperCase());
+        // Big avatar card
+        document.getElementById('dispName').textContent  = data.name  || '—';
+        document.getElementById('dispEmail').textContent = data.email || '—';
+        document.getElementById('dispRole').textContent  = (data.role  || '').replace(/\b\w/g, c => c.toUpperCase());
+        document.getElementById('dispStatus').textContent = data.status || 'Active';
+
+        // Avatar image or initial
+        const bigAv = document.getElementById('bigAvatar');
+        const prevAv = document.getElementById('previewAv');
+        if (data.profile_pic) {
+            bigAv.innerHTML  = `<img src="${data.profile_pic}"><div class="profile-av-overlay">📷</div>`;
+            prevAv.innerHTML = `<img src="${data.profile_pic}"><div class="profile-av-overlay">📷</div>`;
+        } else {
+            document.getElementById('bigInitial').textContent     = initial;
+            document.getElementById('previewInitial').textContent = initial;
+        }
+
+        // Pre-fill form fields
+        document.getElementById('fieldName').value  = data.name  || '';
+        document.getElementById('fieldEmail').value = data.email || '';
+    }
+
+    /* ── Load current user ── */
+    async function loadUser() {
+        try {
+            const res  = await SAMS.apiFetch('/api/me');
+            if (!res.ok) { SAMS.toast('Could not load profile.', 'error'); return; }
+            const data = await res.json();
+            refreshHeader(data);
+        } catch(e) {
+            // Fallback: decode from JWT
+            const pay = SAMS.decodeJWT(SAMS.getToken());
+            if (pay) {
+                document.getElementById('sidebarName').textContent = pay.name || pay.email || '—';
+                document.getElementById('sidebarAv').textContent   = (pay.name || pay.email || '?').charAt(0).toUpperCase();
+                document.getElementById('fieldEmail').value = pay.email || '';
+            }
+        }
+    }
+    loadUser();
+
+    /* ── Details form ── */
+    document.getElementById('detailsForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn = document.getElementById('detailsBtn');
+        btn.disabled = true; btn.textContent = 'Saving…';
+        try {
+            const res  = await SAMS.apiFetch('/api/profile', {
+                method:'PUT',
+                body: JSON.stringify({
+                    name:  document.getElementById('fieldName').value.trim(),
+                    email: document.getElementById('fieldEmail').value.trim()
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNotice('detailsNotice', '', ''); // clear any old notice
+                document.getElementById('detailsNotice').className = 'notice';
+                SAMS.toast(data.message, 'success');
+                flashSaved('detailsSaved');
+                // Refresh displayed name/email
+                document.getElementById('dispName').textContent  = document.getElementById('fieldName').value.trim();
+                document.getElementById('dispEmail').textContent = document.getElementById('fieldEmail').value.trim();
+                document.getElementById('sidebarName').textContent = document.getElementById('fieldName').value.trim();
+            } else {
+                setNotice('detailsNotice', data.error, 'error');
+            }
+        } catch { SAMS.toast('Network error.', 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Save Changes'; }
+    });
+
+    /* ── Password form ── */
+    document.getElementById('passwordForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const pw  = document.getElementById('newPw').value;
+        const cpw = document.getElementById('confirmPw').value;
+        if (pw !== cpw) { setNotice('pwNotice', '❌ Passwords do not match.', 'error'); return; }
+        const btn = document.getElementById('pwBtn');
+        btn.disabled = true; btn.textContent = 'Updating…';
+        try {
+            const res  = await SAMS.apiFetch('/api/profile/password', {
+                method:'PUT', body: JSON.stringify({ password: pw })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('pwNotice').className = 'notice';
+                SAMS.toast(data.message, 'success');
+                document.getElementById('passwordForm').reset();
+                document.getElementById('pwBar').className = 'pw-bar';
+                flashSaved('pwSaved');
+            } else { setNotice('pwNotice', data.error, 'error'); }
+        } catch { SAMS.toast('Network error.', 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Update Password'; }
+    });
+
+    /* ── Picture upload ── */
+    document.getElementById('picForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const file = document.getElementById('picInput').files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('profile_pic', file);
+        try {
+            const res = await fetch('/api/profile/upload-pic', {
+                method:'POST',
+                headers: { 'Authorization': 'Bearer ' + SAMS.getToken() },
+                body: fd
+            });
+            const data = await res.json();
+            if (res.ok) {
+                SAMS.toast(data.message, 'success');
+                if (data.profile_pic) {
+                    const imgHtml = `<img src="${data.profile_pic}"><div class="profile-av-overlay">📷</div>`;
+                    document.getElementById('bigAvatar').innerHTML  = imgHtml;
+                    document.getElementById('previewAv').innerHTML  = imgHtml;
+                    document.getElementById('sidebarAv').innerHTML  = `<img src="${data.profile_pic}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+                }
+                document.getElementById('picNotice').className = 'notice';
+            } else { setNotice('picNotice', data.error, 'error'); }
+        } catch { SAMS.toast('Network error.', 'error'); }
+    });
+})();
+</script>
+</body>
+</html>

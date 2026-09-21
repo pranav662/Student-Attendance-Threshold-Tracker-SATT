@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Portal — SAMS</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="app-shell">
+
+    <!-- ═══ SIDEBAR ════════════════════════════════════════ -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-head">
+            <div class="sidebar-logo">S</div>
+            <div>
+                <div class="sidebar-title">SAMS</div>
+                <span class="sidebar-role">Faculty Portal</span>
+            </div>
+        </div>
+
+        <div class="sidebar-nav">
+            <div class="nav-group-label">Workspace</div>
+            <button class="nav-item active" id="nav-session"    onclick="gotoSection('session',this)">
+                <span class="nav-icon">⚡</span> Live Session
+            </button>
+            <button class="nav-item" id="nav-attendance" onclick="gotoSection('attendance',this)">
+                <span class="nav-icon">✅</span> Mark Attendance
+            </button>
+            <button class="nav-item" id="nav-courses"    onclick="gotoSection('courses',this)">
+                <span class="nav-icon">📚</span> My Courses
+            </button>
+
+            <div class="nav-group-label" style="margin-top:0.5rem;">Account</div>
+            <button class="nav-item" onclick="window.location.href='/profile.html'">
+                <span class="nav-icon">👤</span> My Profile
+            </button>
+            <button class="nav-item" onclick="SAMS.logout()">
+                <span class="nav-icon">🚪</span> Sign Out
+            </button>
+        </div>
+
+        <div class="sidebar-foot">
+            <div class="user-pill">
+                <div class="user-av" id="sidebarAv">F</div>
+                <div>
+                    <div class="user-name" id="sidebarName">Loading…</div>
+                    <div class="user-role-txt">Faculty</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══ MAIN ════════════════════════════════════════════ -->
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-info">
+                <h2 id="topbarTitle">Live Session</h2>
+                <p id="topbarSub">Faculty workspace</p>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-icon" id="themeToggle" aria-label="Toggle theme">☀</button>
+            </div>
+        </header>
+
+        <div class="page">
+
+            <!-- ── SECTION: Live Session (QR) ── -->
+            <div id="section-session">
+                <div class="page-head">
+                    <div class="eyebrow">QR Attendance</div>
+                    <h1>Generate a Live Token</h1>
+                    <p>Select a course and generate a QR code. Students scan it or type the token within 30 seconds.</p>
+                </div>
+
+                <div class="g2" style="align-items:start;">
+                    <div class="card">
+                        <div class="card-head">
+                            <div class="card-title">Start a Session</div>
+                            <div class="card-sub">Pick the course running right now.</div>
+                        </div>
+                        <form id="sessionForm">
+                            <div class="form-group">
+                                <label class="form-label" for="qrCourse">Select Course</label>
+                                <select class="form-select" id="qrCourse" required>
+                                    <option value="">Loading your courses…</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full" id="genBtn">
+                                ⚡ Generate Token
+                            </button>
+                        </form>
+                        <div id="sessionNotice" class="notice"></div>
+                    </div>
+
+                    <div id="tokenCard" style="display:none;">
+                        <div class="token-box" id="tokenDisplay">
+                            <div class="qr-wrap" id="qrHolder"></div>
+                            <div class="token-meta">
+                                <div class="token-lbl">Live Attendance Token</div>
+                                <div class="token-code" id="tokenText">——————</div>
+                                <div class="token-timer">
+                                    <div class="timer-spin" id="timerSpin"></div>
+                                    Expires in <strong id="countdown" style="margin-left:3px;">30</strong>s
+                                </div>
+                                <button type="button" class="btn btn-ghost btn-sm" id="copyBtn" style="margin-top:0.85rem;">
+                                    📋 Copy Token
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── SECTION: Mark Attendance (Manual) ── -->
+            <div id="section-attendance" style="display:none;">
+                <div class="page-head">
+                    <div class="eyebrow">Manual Entry</div>
+                    <h1>Mark Attendance</h1>
+                    <p>Select a course, tick present students, and save. You can also download the PDF report.</p>
+                </div>
+
+                <div class="card">
+                    <div class="form-group">
+                        <label class="form-label" for="attCourse">Select Course</label>
+                        <select class="form-select" id="attCourse" onchange="loadStudents(this.value)">
+                            <option value="">— Choose a course —</option>
+                        </select>
+                    </div>
+
+                    <div id="studentListWrap">
+                        <div class="empty-state">
+                            <div class="ei">📋</div>
+                            <p>Select a course to load enrolled students.</p>
+                        </div>
+                    </div>
+
+                    <div id="attActions" style="display:none; margin-top:1.25rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="saveAttendance()">✅ Save Attendance</button>
+                        <button class="btn btn-ghost"   onclick="downloadReport()">📄 Download PDF</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── SECTION: My Courses ── -->
+            <div id="section-courses" style="display:none;">
+                <div class="page-head">
+                    <div class="eyebrow">Course Management</div>
+                    <h1>My Courses</h1>
+                    <p>View your assigned courses and assign new ones from the catalogue.</p>
+                </div>
+
+                <div class="g2" style="align-items:start;">
+                    <div class="card">
+                        <div class="card-head">
+                            <div class="section-title"><div class="section-icon">📚</div>Assigned to Me</div>
+                        </div>
+                        <div id="myCoursesList">
+                            <div class="empty-state"><div class="ei">📂</div><p>Loading…</p></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-head">
+                            <div class="section-title"><div class="section-icon">➕</div>Assign a Course</div>
+                            <div class="card-sub" style="margin-top:0.25rem;">Pick from the available catalogue.</div>
+                        </div>
+                        <form id="assignForm">
+                            <div class="form-group">
+                                <label class="form-label" for="availCourse">Available Courses</label>
+                                <select class="form-select" id="availCourse" required>
+                                    <option value="">Loading…</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Assign to Me</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.page -->
+    </div><!-- /.main -->
+</div><!-- /.app-shell -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/app.js"></script>
+<script>
+(function() {
+    'use strict';
+    SAMS.initTheme();
+    SAMS.requireAuth();
+
+    let timerInterval = null;
+    let courses = [];
+
+    /* ── Populate user info from JWT ── */
+    const token   = SAMS.getToken();
+    const payload = SAMS.decodeJWT(token);
+    if (payload && payload.name) {
+        document.getElementById('sidebarName').textContent = payload.name;
+        document.getElementById('sidebarAv').textContent   = payload.name.charAt(0).toUpperCase();
+    }
+
+    /* ── Section navigation ── */
+    const topTitles = {
+        session:    ['Live Session',    'Generate a QR attendance token for your class'],
+        attendance: ['Mark Attendance', 'Manually record student attendance'],
+        courses:    ['My Courses',      'Manage your assigned course load']
+    };
+    function gotoSection(name, el) {
+        document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
+        document.getElementById('section-' + name).style.display = 'block';
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        if (el) el.classList.add('active');
+        const [t, s] = topTitles[name] || [name, ''];
+        document.getElementById('topbarTitle').textContent = t;
+        document.getElementById('topbarSub').textContent   = s;
+        if (name === 'courses')    { loadMyCourses(); loadAvailableCourses(); }
+        if (name === 'attendance') { populateAttCourses(); }
+    }
+    window.gotoSection = gotoSection;
+
+    /* ── Load courses (used by session & attendance selects) ── */
+    async function loadCourses() {
+        try {
+            const res = await SAMS.apiFetch('/api/faculty/courses');
+            courses   = await res.json();
+            const opts = Array.isArray(courses) && courses.length
+                ? '<option value="">— Select a course —</option>' +
+                  courses.map(c => `<option value="${c.course_id}">${SAMS.escapeHTML(c.course_code)} — ${SAMS.escapeHTML(c.course_name)}</option>`).join('')
+                : '<option value="">No courses assigned yet</option>';
+            document.getElementById('qrCourse').innerHTML  = opts;
+            document.getElementById('attCourse').innerHTML = opts;
+        } catch(e) { console.error(e); }
+    }
+
+    function populateAttCourses() { /* already populated */ }
+
+    /* ── QR token generation ── */
+    document.getElementById('sessionForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const btn    = document.getElementById('genBtn');
+        const notice = document.getElementById('sessionNotice');
+        btn.disabled = true; btn.textContent = '⏳ Generating…';
+        notice.className = 'notice';
+        clearInterval(timerInterval);
+
+        try {
+            const res  = await SAMS.apiFetch('/api/qr/generate', {
+                method:'POST',
+                body: JSON.stringify({ course_id: document.getElementById('qrCourse').value })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                // Render QR
+                const holder = document.getElementById('qrHolder');
+                holder.innerHTML = '';
+                if (window.QRCode) {
+                    new QRCode(holder, { text: data.token, width:140, height:140, colorDark:'#1E1B4B', colorLight:'#ffffff' });
+                }
+                document.getElementById('tokenText').textContent = data.token;
+                document.getElementById('tokenCard').style.display = 'block';
+                document.getElementById('tokenText').style.opacity = '1';
+                document.getElementById('timerSpin').style.display = 'block';
+
+                let secs = 30;
+                document.getElementById('countdown').textContent = secs;
+                timerInterval = setInterval(() => {
+                    secs--;
+                    document.getElementById('countdown').textContent = Math.max(secs, 0);
+                    if (secs <= 0) {
+                        clearInterval(timerInterval);
+                        document.getElementById('tokenText').style.opacity = '0.3';
+                        document.getElementById('timerSpin').style.display = 'none';
+                        SAMS.toast('Token expired. Generate a new one.', 'info');
+                    }
+                }, 1000);
+            } else {
+                notice.textContent  = data.error || 'Failed to generate token.';
+                notice.className    = 'notice show error';
+                document.getElementById('tokenCard').style.display = 'none';
+            }
+        } catch(err) { if (err.message !== 'unauthorized') { notice.textContent = 'Network error.'; notice.className = 'notice show error'; } }
+        finally { btn.disabled = false; btn.textContent = '⚡ Generate Token'; }
+    });
+
+    document.getElementById('copyBtn').addEventListener('click', async () => {
+        const text = document.getElementById('tokenText').textContent;
+        try { await navigator.clipboard.writeText(text); SAMS.toast('Token copied!', 'success', 2000); }
+        catch { SAMS.toast('Select and copy manually.', 'info'); }
+    });
+
+    /* ── Load students for manual attendance ── */
+    window.loadStudents = async function(courseId) {
+        const wrap    = document.getElementById('studentListWrap');
+        const actions = document.getElementById('attActions');
+        if (!courseId) {
+            wrap.innerHTML = '<div class="empty-state"><div class="ei">📋</div><p>Select a course to load enrolled students.</p></div>';
+            actions.style.display = 'none'; return;
+        }
+        wrap.innerHTML = '<div class="empty-state"><p>Loading students…</p></div>';
+        try {
+            const res      = await SAMS.apiFetch(`/api/faculty/students?course_id=${courseId}`);
+            const students = await res.json();
+            if (!students.length) {
+                wrap.innerHTML = '<div class="empty-state"><div class="ei">👥</div><p>No students enrolled in this course.</p></div>';
+                actions.style.display = 'none'; return;
+            }
+            wrap.innerHTML = `<div class="chk-list">${students.map(s => `
+                <label class="chk-item">
+                    <input type="checkbox" name="sid" value="${s.student_id}">
+                    <div class="chk-box"></div>
+                    <div>
+                        <div class="chk-name">${SAMS.escapeHTML(s.name)}</div>
+                        <div class="chk-roll">${SAMS.escapeHTML(s.roll_number || '')}</div>
+                    </div>
+                </label>`).join('')}</div>`;
+            actions.style.display = 'flex';
+        } catch(e) {
+            wrap.innerHTML = '<div class="empty-state"><p style="color:var(--danger)">Failed to load students.</p></div>';
+        }
+    };
+
+    window.saveAttendance = async function() {
+        const courseId = document.getElementById('attCourse').value;
+        if (!courseId) return SAMS.toast('Select a course first.', 'error');
+        const sids = Array.from(document.querySelectorAll('input[name="sid"]:checked')).map(cb => +cb.value);
+        try {
+            const res  = await SAMS.apiFetch('/api/faculty/mark-attendance', {
+                method:'POST',
+                body: JSON.stringify({ course_id: +courseId, student_ids: sids })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                SAMS.toast(data.message, 'success');
+                document.querySelectorAll('input[name="sid"]').forEach(cb => cb.checked = false);
+            } else { SAMS.toast(data.error, 'error'); }
+        } catch(e) { SAMS.toast('Network error.', 'error'); }
+    };
+
+    window.downloadReport = function() {
+        const cid = document.getElementById('attCourse').value;
+        if (!cid) return SAMS.toast('Select a course first.', 'error');
+        window.open(`/api/faculty/report/pdf?course_id=${cid}&token=${SAMS.getToken()}`, '_blank');
+    };
+
+    /* ── My Courses list ── */
+    async function loadMyCourses() {
+        const list = document.getElementById('myCoursesList');
+        try {
+            const res  = await SAMS.apiFetch('/api/faculty/courses');
+            const data = await res.json();
+            list.innerHTML = data.length
+                ? data.map(c => `
+                    <div class="course-row">
+                        <div class="course-dot"></div>
+                        <div>
+                            <div style="font-size:0.875rem;font-weight:600;color:var(--text-1);">${SAMS.escapeHTML(c.course_name)}</div>
+                            <div class="mono" style="font-size:0.72rem;color:var(--text-3);">${SAMS.escapeHTML(c.course_code)}</div>
+                        </div>
+                    </div>`).join('')
+                : '<div class="empty-state"><div class="ei">📂</div><p>No courses assigned yet.</p></div>';
+        } catch { list.innerHTML = '<p style="color:var(--danger);font-size:0.85rem;">Failed to load.</p>'; }
+    }
+
+    async function loadAvailableCourses() {
+        const sel = document.getElementById('availCourse');
+        try {
+            const res     = await SAMS.apiFetch('/api/faculty/available-courses');
+            const courses = await res.json();
+            sel.innerHTML = Array.isArray(courses) && courses.length
+                ? '<option value="">— Pick a course —</option>' +
+                  courses.map(c => `<option value="${c.course_id}">${SAMS.escapeHTML(c.course_code)} — ${SAMS.escapeHTML(c.course_name)}</option>`).join('')
+                : '<option value="">No new courses available</option>';
+        } catch { console.error('Could not load available courses'); }
+    }
+
+    document.getElementById('assignForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const cid = document.getElementById('availCourse').value;
+        if (!cid) return;
+        try {
+            const res  = await SAMS.apiFetch('/api/faculty/assign-course', {
+                method:'POST', body: JSON.stringify({ course_id: +cid })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                SAMS.toast(data.message, 'success');
+                await loadCourses(); loadMyCourses(); loadAvailableCourses();
+            } else { SAMS.toast(data.error, 'error'); }
+        } catch { SAMS.toast('Network error.', 'error'); }
+    });
+
+    loadCourses();
+})();
+</script>
+</body>
+</html>
