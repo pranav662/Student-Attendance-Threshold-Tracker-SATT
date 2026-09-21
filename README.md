@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Smart Attendance Management System (SAMS)
 
 SAMS is a modern, enterprise-grade web application designed for universities to securely and efficiently track student attendance using real-time QR sessions. 
