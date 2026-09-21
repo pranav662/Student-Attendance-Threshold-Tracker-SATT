@@ -78,6 +78,27 @@ function requireRole(role) {
 }
 function makeRollNumber() { return `STU-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`; }
 
+// ==========================================
+// Attendance Threshold Engine
+// ==========================================
+const ATTENDANCE_THRESHOLD = 75; // Minimum required attendance %
+
+function calcThreshold(attended, total) {
+  const pct = total === 0 ? 0 : Number(((attended / total) * 100).toFixed(2));
+  const t = ATTENDANCE_THRESHOLD / 100;
+  let status = 'no_classes', canMiss = 0, needToAttend = 0;
+  if (total > 0) {
+    if (pct >= ATTENDANCE_THRESHOLD) {
+      status = pct >= 85 ? 'safe' : 'near_threshold';
+      canMiss = Math.max(0, Math.floor((attended - t * total) / t));
+    } else {
+      status = pct >= 60 ? 'at_risk' : 'critical';
+      needToAttend = Math.max(0, Math.ceil((t * total - attended) / (1 - t)));
+    }
+  }
+  return { percentage: pct, status, threshold: ATTENDANCE_THRESHOLD, canMiss, needToAttend };
+}
+
 async function createStudent({ email, password, name, batchYear = new Date().getFullYear() }) {
   const connection = await pool.getConnection();
   try {
@@ -206,17 +227,64 @@ app.post('/api/qr/generate', authenticate, requireRole('faculty'), async (req, r
 
 app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, res, next) => {
   try {
+    // Overall attendance across all enrolled courses
     const [rows] = await pool.execute(
-      `SELECT s.student_id, s.name, COUNT(ar.record_id) AS attended_classes,
-       (SELECT COUNT(*) FROM sessions se JOIN enrollments e ON e.course_id = se.course_id WHERE e.student_id = s.student_id) AS total_classes
-       FROM students s LEFT JOIN attendance_records ar ON ar.student_id = s.student_id AND ar.status = 'Present'
-       WHERE s.user_id = ? GROUP BY s.student_id, s.name`, [req.user.sub]
+      `SELECT s.student_id, s.name,
+              COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended_classes,
+              (SELECT COUNT(DISTINCT se.session_id) FROM sessions se
+               JOIN enrollments e ON e.course_id = se.course_id
+               WHERE e.student_id = s.student_id) AS total_classes
+       FROM students s
+       LEFT JOIN attendance_records ar ON ar.student_id = s.student_id
+       WHERE s.user_id = ?
+       GROUP BY s.student_id, s.name`,
+      [req.user.sub]
     );
     const student = rows[0];
     if (!student) return fail(res, 404, 'Student profile not found.');
     const total = Number(student.total_classes), attended = Number(student.attended_classes);
-    const percentage = total === 0 ? 0 : Number(((attended / total) * 100).toFixed(2));
-    return res.json({ ...student, total_classes: total, attended_classes: attended, percentage, status: percentage >= 75 ? 'Safe' : 'At Risk' });
+    const overall = calcThreshold(attended, total);
+
+    // Per-course breakdown with individual threshold calculations
+    const [courseRows] = await pool.execute(
+      `SELECT c.course_id, c.course_code, c.course_name,
+              COUNT(DISTINCT se.session_id) AS total_classes,
+              COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended_classes
+       FROM students s
+       JOIN enrollments e ON e.student_id = s.student_id
+       JOIN courses c ON c.course_id = e.course_id
+       LEFT JOIN sessions se ON se.course_id = c.course_id
+       LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
+       WHERE s.user_id = ?
+       GROUP BY c.course_id, c.course_code, c.course_name
+       ORDER BY c.course_code`,
+      [req.user.sub]
+    );
+
+    const courses = courseRows.map(c => {
+      const ct = Number(c.total_classes), ca = Number(c.attended_classes);
+      const thr = calcThreshold(ca, ct);
+      return {
+        course_id: c.course_id, course_code: c.course_code, course_name: c.course_name,
+        total: ct, attended: ca, absent: ct - ca,
+        percentage: thr.percentage, status: thr.status,
+        canMiss: thr.canMiss, needToAttend: thr.needToAttend
+      };
+    });
+
+    return res.json({
+      student_id: student.student_id,
+      name: student.name,
+      total_classes: total,
+      attended_classes: attended,
+      absent_classes: total - attended,
+      percentage: overall.percentage,
+      status: overall.status,
+      threshold: ATTENDANCE_THRESHOLD,
+      can_miss: overall.canMiss,
+      need_to_attend: overall.needToAttend,
+      courses
+    });
   } catch (error) { return next(error); }
 });
 
@@ -246,22 +314,7 @@ app.post('/api/qr/scan', authenticate, requireRole('student'), async (req, res, 
 // ==========================================
 // Profile Management
 // ==========================================
-app.put('/api/profile', authenticate, async (req, res, next) => {
-  try {
-    const { name, email } = req.body;
-    if (!name || !email) return fail(res, 400, 'Name and email are required.');
-    
-    // Update name in faculty or student table
-    if (req.user.role === 'faculty') {
-      await pool.execute('UPDATE faculty SET name = ? WHERE user_id = ?', [name, req.user.sub]);
-    } else if (req.user.role === 'student') {
-      await pool.execute('UPDATE students SET name = ? WHERE user_id = ?', [name, req.user.sub]);
-    }
-    
-    await pool.execute('UPDATE users SET email = ? WHERE user_id = ?', [email, req.user.sub]);
-    return res.json({ message: 'Profile updated successfully.' });
-  } catch (error) { return next(error); }
-});
+// PUT /api/profile is defined below (see profile management section)
 
 app.put('/api/profile/password', authenticate, async (req, res, next) => {
   try {
@@ -452,11 +505,18 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
 // PROFILE ROUTES
 // ==========================================
 
-// GET current user info
+// GET current user info (name lives in students/faculty, not users)
 app.get('/api/me', authenticate, async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT user_id, name, email, role, profile_pic FROM users WHERE user_id = ?',
+      `SELECT u.user_id, u.email, u.role, u.profile_pic, u.status,
+              COALESCE(s.name, f.name) AS name,
+              s.roll_number, s.batch_year,
+              f.employee_id, f.designation
+       FROM users u
+       LEFT JOIN students s ON s.user_id = u.user_id
+       LEFT JOIN faculty  f ON f.user_id = u.user_id
+       WHERE u.user_id = ?`,
       [req.user.sub]
     );
     if (!rows[0]) return fail(res, 404, 'User not found.');
@@ -469,13 +529,12 @@ app.put('/api/profile', authenticate, async (req, res, next) => {
   try {
     const name  = stringValue(req.body.name);
     const email = stringValue(req.body.email).toLowerCase();
-    if (!name || name.length < 2)       return fail(res, 400, 'Name must be at least 2 characters.');
-    if (!EMAIL_PATTERN.test(email))      return fail(res, 400, 'Please enter a valid email address.');
-    // Check email not taken by another user
+    if (!name || name.length < 2)    return fail(res, 400, 'Name must be at least 2 characters.');
+    if (!EMAIL_PATTERN.test(email))  return fail(res, 400, 'Please enter a valid email address.');
     const [existing] = await pool.execute('SELECT user_id FROM users WHERE email = ? AND user_id != ?', [email, req.user.sub]);
-    if (existing.length) return fail(res, 409, 'That email is already in use.');
-    await pool.execute('UPDATE users SET name = ?, email = ? WHERE user_id = ?', [name, email, req.user.sub]);
-    // Also update students/faculty table name if exists
+    if (existing.length)             return fail(res, 409, 'That email is already in use.');
+    // Update email in users; name lives in students/faculty tables
+    await pool.execute('UPDATE users SET email = ? WHERE user_id = ?', [email, req.user.sub]);
     if (req.user.role === 'student') await pool.execute('UPDATE students SET name = ? WHERE user_id = ?', [name, req.user.sub]).catch(() => {});
     if (req.user.role === 'faculty') await pool.execute('UPDATE faculty  SET name = ? WHERE user_id = ?', [name, req.user.sub]).catch(() => {});
     res.json({ message: 'Profile updated successfully.' });

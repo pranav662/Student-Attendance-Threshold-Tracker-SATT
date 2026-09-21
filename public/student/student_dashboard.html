@@ -1,479 +1,893 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Portal — SAMS</title>
-    <link rel="stylesheet" href="/styles.css">
-    <style>
-        /* Attendance progress bar */
-        .att-bar-wrap { background: var(--border); border-radius: 99px; height: 6px; overflow: hidden; }
-        .att-bar-fill { height: 100%; border-radius: 99px; transition: width 1s ease; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard — SATT</title>
+  <meta name="description" content="Student attendance dashboard — view your attendance, courses, and threshold status.">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
 </head>
 <body>
 <div class="app-shell">
 
-    <!-- ═══ SIDEBAR ════════════════════════════════════════ -->
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-head">
-            <div class="sidebar-logo">S</div>
+  <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <div class="sidebar-logo">S</div>
+      <div>
+        <div class="sidebar-title">SATT</div>
+        <span class="sidebar-role">Student Portal</span>
+      </div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-group-label">Academic</div>
+      <button class="nav-item active" data-section="overview" onclick="gotoSection('overview',this)">
+        <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+      </button>
+      <button class="nav-item" data-section="courses" onclick="gotoSection('courses',this)">
+        <i data-lucide="book-open"></i><span>My Courses</span>
+      </button>
+      <button class="nav-item" data-section="threshold" onclick="gotoSection('threshold',this)">
+        <i data-lucide="bar-chart-2"></i><span>Threshold</span>
+      </button>
+
+      <div class="nav-group-label">Actions</div>
+      <button class="nav-item" data-section="scan" onclick="gotoSection('scan',this)">
+        <i data-lucide="scan-line"></i><span>Mark Attendance</span>
+      </button>
+      <button class="nav-item" data-section="enroll" onclick="gotoSection('enroll',this)">
+        <i data-lucide="plus-circle"></i><span>Enroll in Course</span>
+      </button>
+
+      <div class="nav-group-label">Account</div>
+      <button class="nav-item" onclick="window.location.href='/profile.html'">
+        <i data-lucide="user"></i><span>Profile</span>
+      </button>
+      <button class="nav-item" onclick="SAMS.logout()">
+        <i data-lucide="log-out"></i><span>Sign Out</span>
+      </button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="user-pill">
+        <div class="user-av" id="sidebarAv">S</div>
+        <div>
+          <div class="user-name" id="sidebarName">Loading…</div>
+          <div class="user-role-txt">Student</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="sidebar-backdrop" id="backdrop" onclick="closeSidebar()"></div>
+
+  <!-- ══ MAIN ══════════════════════════════════════════════════ -->
+  <div class="main">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="menuBtn" onclick="openSidebar()" aria-label="Open menu">
+          <i data-lucide="menu"></i>
+        </button>
+        <div class="topbar-info">
+          <h2 id="topbarTitle">Dashboard</h2>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost btn-sm" id="dlBtn" onclick="downloadReport()" title="Download attendance PDF">
+          <i data-lucide="download"></i> Report
+        </button>
+        <button class="btn-icon" id="themeToggle" aria-label="Toggle theme" title="Toggle theme"></button>
+      </div>
+    </header>
+
+    <div class="page">
+
+      <!-- ══ SECTION: OVERVIEW ════════════════════════════════ -->
+      <div id="section-overview">
+        <div class="greeting-row">
+          <div>
+            <div class="greeting-text" id="greetingText">Welcome</div>
+            <h1 class="greeting-name" id="greetingName">Student</h1>
+            <div class="greeting-meta" id="greetingMeta">Student Portal</div>
+          </div>
+          <div class="greeting-date" id="greetingDate"></div>
+        </div>
+
+        <!-- 4 stat cards -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-card-icon attended"><i data-lucide="check-circle-2"></i></div>
+            <div class="stat-card-body">
+              <div class="stat-card-val skel" id="statAttended">—</div>
+              <div class="stat-card-lbl">Classes Attended</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon total"><i data-lucide="calendar"></i></div>
+            <div class="stat-card-body">
+              <div class="stat-card-val skel" id="statTotal">—</div>
+              <div class="stat-card-lbl">Total Conducted</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon absent"><i data-lucide="x-circle"></i></div>
+            <div class="stat-card-body">
+              <div class="stat-card-val skel" id="statAbsent">—</div>
+              <div class="stat-card-lbl">Classes Absent</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-icon courses"><i data-lucide="book-open"></i></div>
+            <div class="stat-card-body">
+              <div class="stat-card-val skel" id="statCourses">—</div>
+              <div class="stat-card-lbl">Enrolled Courses</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance ring + threshold panel -->
+        <div class="attendance-grid" style="margin-bottom:1.25rem;">
+          <!-- Ring card -->
+          <div class="card" style="text-align:center;">
+            <div class="card-label" style="text-align:left;margin-bottom:1rem;">Overall Attendance</div>
+            <div class="ring-wrap">
+              <svg class="ring-svg" width="160" height="160" viewBox="0 0 160 160" aria-label="Attendance ring">
+                <circle class="ring-track" cx="80" cy="80" r="64"/>
+                <circle class="ring-fill" cx="80" cy="80" r="64"
+                  id="ringArc"
+                  stroke-dasharray="402.12"
+                  stroke-dashoffset="402.12"/>
+                <text class="ring-num" x="80" y="75" text-anchor="middle" dominant-baseline="middle" id="ringPct">0%</text>
+                <text class="ring-sub" x="80" y="96" text-anchor="middle" id="ringSubLabel">of classes</text>
+              </svg>
+            </div>
+            <div class="ring-status" id="ringStatus" style="color:var(--text-3);">Loading...</div>
+          </div>
+
+          <!-- Threshold summary card -->
+          <div class="card">
+            <div class="card-label" style="margin-bottom:0.875rem;">Attendance Threshold</div>
+            <div class="threshold-rows">
+              <div class="threshold-row">
+                <span class="threshold-label">Your Attendance</span>
+                <span class="threshold-value" id="thrCurrent">—</span>
+              </div>
+              <div class="threshold-row">
+                <span class="threshold-label">Minimum Required</span>
+                <span class="threshold-value muted">75%</span>
+              </div>
+              <div class="threshold-row">
+                <span class="threshold-label">Status</span>
+                <span class="threshold-value" id="thrStatusBadge">—</span>
+              </div>
+            </div>
+            <div class="threshold-bar-wrap" style="margin-top:0.875rem;">
+              <div class="threshold-bar-track">
+                <div class="threshold-bar-fill" id="thrBarFill" style="width:0%"></div>
+                <div class="threshold-marker" style="left:75%;" title="75% threshold"></div>
+              </div>
+              <div class="threshold-bar-labels">
+                <span>0%</span>
+                <span style="color:var(--text-2);font-weight:600;">75%</span>
+                <span>100%</span>
+              </div>
+            </div>
+            <div class="threshold-message" id="thrMessage" style="margin-top:0.875rem;">Calculating…</div>
+          </div>
+        </div>
+
+        <!-- Course breakdown preview -->
+        <div class="card" id="courseBreakdownCard">
+          <div class="section-head" style="margin-bottom:0.875rem;">
+            <div class="section-title">
+              <div class="section-icon"><i data-lucide="book-open"></i></div>
+              Course Breakdown
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="gotoSection('courses', null)">
+              View all <i data-lucide="chevron-right"></i>
+            </button>
+          </div>
+          <div id="courseBreakdown">
+            <div class="empty-state"><div class="ei">📖</div><p>Loading course data…</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SECTION: MY COURSES ═══════════════════════════════ -->
+      <div id="section-courses" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic Record</div>
+          <h1>My Courses</h1>
+          <p>Subject-wise attendance breakdown for all enrolled courses.</p>
+        </div>
+
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="section-title">
+              <div class="section-icon"><i data-lucide="table"></i></div>
+              Attendance by Subject
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="downloadReport()">
+              <i data-lucide="download"></i> PDF Report
+            </button>
+          </div>
+          <div class="data-table-wrap" style="border:none;border-radius:0;">
+            <table class="data-table" id="coursesTable">
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th>Conducted</th>
+                  <th>Attended</th>
+                  <th>Absent</th>
+                  <th>Attendance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="courseTableBody">
+                <tr><td colspan="6"><div class="empty-state"><div class="ei">📚</div><p>Loading courses…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SECTION: THRESHOLD ════════════════════════════════ -->
+      <div id="section-threshold" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Planning Tool</div>
+          <h1>Attendance Threshold</h1>
+          <p>Understand your standing and plan ahead with the what-if calculator.</p>
+        </div>
+
+        <div class="g2" style="margin-bottom:1rem;">
+          <!-- Current standing -->
+          <div class="card">
+            <div class="card-label" style="margin-bottom:0.875rem;">Your Current Standing</div>
+            <div style="font-size:3rem;font-weight:800;color:var(--text-1);font-variant-numeric:tabular-nums;line-height:1;" id="thrBigPct">—%</div>
+            <div style="font-size:0.8125rem;color:var(--text-3);margin-top:0.375rem;" id="thrBigSub">Loading...</div>
+            <div style="margin-top:1rem;" id="thrBigMsg"></div>
+            <div class="threshold-bar-wrap" style="margin-top:1rem;">
+              <div class="threshold-bar-track">
+                <div class="threshold-bar-fill" id="thrBarFill2" style="width:0%"></div>
+                <div class="threshold-marker" style="left:75%;"></div>
+              </div>
+              <div class="threshold-bar-labels"><span>0%</span><span>75%</span><span>100%</span></div>
+            </div>
+          </div>
+
+          <!-- Math breakdown -->
+          <div class="card">
+            <div class="card-label" style="margin-bottom:0.875rem;">Calculation Breakdown</div>
+            <div class="threshold-rows">
+              <div class="threshold-row">
+                <span class="threshold-label">Attended</span>
+                <span class="threshold-value" id="thrMathAttended">—</span>
+              </div>
+              <div class="threshold-row">
+                <span class="threshold-label">Total conducted</span>
+                <span class="threshold-value" id="thrMathTotal">—</span>
+              </div>
+              <div class="threshold-row">
+                <span class="threshold-label">Absent classes</span>
+                <span class="threshold-value" id="thrMathAbsent">—</span>
+              </div>
+              <div class="threshold-row">
+                <span class="threshold-label">Formula</span>
+                <span class="threshold-value" style="font-size:0.75rem;color:var(--text-3);font-family:var(--font-mono);" id="thrFormula">A/T × 100</span>
+              </div>
+            </div>
+            <div style="margin-top:0.875rem;padding:0.625rem 0.75rem;background:var(--bg-hover);border-radius:var(--r-sm);" id="thrCanMissSection">
+              <div style="font-size:0.75rem;color:var(--text-3);margin-bottom:2px;" id="thrCanMissLabel">Can miss</div>
+              <div style="font-size:1.5rem;font-weight:700;color:var(--text-1);font-variant-numeric:tabular-nums;" id="thrCanMissVal">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- What-If Calculator -->
+        <div class="card">
+          <div class="card-head">
             <div>
-                <div class="sidebar-title">SAMS</div>
-                <span class="sidebar-role">Student Portal</span>
+              <div class="card-title">What-If Calculator</div>
+              <div class="card-sub">Simulate different attendance scenarios</div>
             </div>
+            <div class="section-icon"><i data-lucide="calculator"></i></div>
+          </div>
+
+          <div class="calc-grid">
+            <div class="form-group">
+              <label class="form-label" for="wifBase">Attended so far</label>
+              <input class="form-input" type="number" id="wifBase" min="0" placeholder="e.g. 40">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="wifTotal">Conducted so far</label>
+              <input class="form-input" type="number" id="wifTotal" min="0" placeholder="e.g. 55">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="wifAttendMore">I will attend <em>more</em> classes</label>
+              <input class="form-input" type="number" id="wifAttendMore" min="0" value="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="wifMissMore">I will miss <em>more</em> classes</label>
+              <input class="form-input" type="number" id="wifMissMore" min="0" value="0" placeholder="0">
+            </div>
+          </div>
+
+          <div class="calc-result" id="calcResult">
+            <div>
+              <div class="calc-result-pct" id="calcResultPct">—%</div>
+              <div class="calc-result-detail" id="calcResultDetail">Enter values above to simulate</div>
+            </div>
+            <span class="badge" id="calcResultBadge" style="margin-left:auto;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SECTION: MARK ATTENDANCE (QR Scan) ═══════════════ -->
+      <div id="section-scan" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Attendance</div>
+          <h1>Mark Your Attendance</h1>
+          <p>Enter the 6-character QR token displayed by your faculty.</p>
         </div>
 
-        <div class="sidebar-nav">
-            <div class="nav-group-label">My Academics</div>
-            <button class="nav-item active" id="nav-overview" onclick="gotoSection('overview',this)">
-                <span class="nav-icon">📊</span> My Attendance
-            </button>
-            <button class="nav-item" id="nav-scan"     onclick="gotoSection('scan',this)">
-                <span class="nav-icon">📷</span> Mark Attendance
-            </button>
-            <button class="nav-item" id="nav-enroll"   onclick="gotoSection('enroll',this)">
-                <span class="nav-icon">📚</span> Enroll in Course
-            </button>
+        <div class="g2" style="max-width:680px;">
+          <!-- Manual token entry -->
+          <div class="card" style="grid-column:1/-1;">
+            <div class="card-head">
+              <div>
+                <div class="card-title">Enter Session Token</div>
+                <div class="card-sub">The token is valid for a limited time — enter it quickly.</div>
+              </div>
+              <div class="section-icon"><i data-lucide="keyboard"></i></div>
+            </div>
+            <form id="scanForm" style="max-width:320px;">
+              <div class="form-group">
+                <label class="form-label" for="qrTokenInput">Session Token</label>
+                <input class="form-input scan-field" id="qrTokenInput" maxlength="6"
+                  placeholder="ABC123" autocomplete="off" autocorrect="off" spellcheck="false" required>
+                <div class="form-hint">6-character token shown on the faculty's screen</div>
+              </div>
+              <div style="display:flex;gap:0.625rem;">
+                <button type="submit" class="btn btn-primary" id="scanBtn">
+                  <i data-lucide="check"></i> Mark Present
+                </button>
+                <button type="button" class="btn btn-ghost" id="cameraBtn" onclick="openScanner()">
+                  <i data-lucide="camera"></i> Scan QR
+                </button>
+              </div>
+            </form>
+            <div id="scanNotice" class="notice"></div>
+          </div>
+        </div>
+      </div>
 
-            <div class="nav-group-label" style="margin-top:0.5rem;">Account</div>
-            <button class="nav-item" onclick="window.location.href='/profile.html'">
-                <span class="nav-icon">👤</span> My Profile
-            </button>
-            <button class="nav-item" onclick="SAMS.logout()">
-                <span class="nav-icon">🚪</span> Sign Out
-            </button>
+      <!-- ══ SECTION: ENROLL ═══════════════════════════════════ -->
+      <div id="section-enroll" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Course Registration</div>
+          <h1>Enroll in a Course</h1>
+          <p>Browse available courses and enroll for the current semester.</p>
         </div>
 
-        <div class="sidebar-foot">
-            <div class="user-pill">
-                <div class="user-av" id="sidebarAv">S</div>
-                <div>
-                    <div class="user-name" id="sidebarName">Loading…</div>
-                    <div class="user-role-txt">Student</div>
-                </div>
+        <div class="card" style="max-width:640px;">
+          <div class="card-head">
+            <div>
+              <div class="card-title">Available Courses</div>
+              <div class="card-sub">Select a course to enroll</div>
             </div>
+            <div class="section-icon"><i data-lucide="plus-circle"></i></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="courseSelect">Course</label>
+            <select class="form-select" id="courseSelect">
+              <option value="">Loading available courses…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="semesterInput">Semester</label>
+            <input class="form-input" id="semesterInput" type="text" placeholder="e.g. Fall 2026" required>
+          </div>
+          <button class="btn btn-primary" id="enrollBtn" onclick="enrollCourse()">
+            <i data-lucide="check-circle"></i> Confirm Enrollment
+          </button>
+          <div id="enrollNotice" class="notice"></div>
         </div>
-    </nav>
+      </div>
 
-    <!-- ═══ MAIN ════════════════════════════════════════════ -->
-    <div class="main">
-        <header class="topbar">
-            <div class="topbar-info">
-                <h2 id="topbarTitle">My Attendance</h2>
-                <p id="topbarSub">Loading your records…</p>
-            </div>
-            <div class="topbar-right">
-                <button class="btn btn-ghost btn-sm" onclick="downloadReport()" id="dlBtn">📄 Download Report</button>
-                <button class="btn-icon" id="themeToggle" aria-label="Toggle theme">☀</button>
-            </div>
-        </header>
-
-        <div class="page">
-
-            <!-- ── SECTION: Overview ── -->
-            <div id="section-overview">
-                <div class="page-head">
-                    <div class="eyebrow">Academic Record</div>
-                    <h1>Your Attendance</h1>
-                    <p>Live metrics across all enrolled lectures.</p>
-                </div>
-
-                <!-- Stat row -->
-                <div class="g4" style="margin-bottom:1.5rem;">
-                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#6366F1,#818CF8);--tile-icon-bg:rgba(99,102,241,0.12);">
-                        <div class="stat-icon">✅</div>
-                        <div class="stat-val skel" id="statAttended">—</div>
-                        <div class="stat-lbl">Classes Attended</div>
-                        <div class="stat-note">Verified sessions</div>
-                    </div>
-                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#38BDF8,#0EA5E9);--tile-icon-bg:rgba(56,189,248,0.12);">
-                        <div class="stat-icon">📅</div>
-                        <div class="stat-val skel" id="statTotal">—</div>
-                        <div class="stat-lbl">Total Scheduled</div>
-                        <div class="stat-note">Across all courses</div>
-                    </div>
-                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#10B981,#059669);--tile-icon-bg:rgba(16,185,129,0.12);">
-                        <div class="stat-icon">📈</div>
-                        <div class="stat-val skel" id="statPct">—</div>
-                        <div class="stat-lbl">Overall Rate</div>
-                        <div class="stat-note" id="statStatus">Evaluating…</div>
-                    </div>
-                    <div class="stat-tile" style="--tile-bar:linear-gradient(90deg,#A78BFA,#7C3AED);--tile-icon-bg:rgba(167,139,250,0.12);">
-                        <div class="stat-icon">📚</div>
-                        <div class="stat-val skel" id="statCourses">—</div>
-                        <div class="stat-lbl">Enrolled Courses</div>
-                        <div class="stat-note">Active enrollments</div>
-                    </div>
-                </div>
-
-                <!-- Ring + Course breakdown -->
-                <div class="g2" style="align-items:start;">
-                    <!-- Donut ring -->
-                    <div class="card" style="display:flex;flex-direction:column;align-items:center;padding:2rem 1.5rem;">
-                        <div class="ring-wrap">
-                            <svg class="ring-svg" width="170" height="170" viewBox="0 0 170 170">
-                                <defs>
-                                    <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
-                                        <stop offset="0%"   stop-color="#6366F1"/>
-                                        <stop offset="100%" stop-color="#38BDF8"/>
-                                    </linearGradient>
-                                </defs>
-                                <circle class="ring-track" cx="85" cy="85" r="68" stroke-width="12"/>
-                                <circle class="ring-fill"  cx="85" cy="85" r="68" stroke-width="12"
-                                    id="ringArc"
-                                    stroke-dasharray="427.26"
-                                    stroke-dashoffset="427.26"/>
-                                <text class="ring-num" x="85" y="82"  text-anchor="middle" dominant-baseline="middle" id="ringPct">0%</text>
-                                <text class="ring-sub" x="85" y="100" text-anchor="middle" dominant-baseline="middle">Attendance</text>
-                            </svg>
-                        </div>
-                        <div style="text-align:center;margin-top:1rem;">
-                            <div style="font-weight:700;font-size:0.9rem;" id="ringStatus">—</div>
-                            <div style="font-size:0.75rem;color:var(--text-3);margin-top:0.2rem;">Overall standing</div>
-                        </div>
-                    </div>
-
-                    <!-- Course breakdown -->
-                    <div class="card">
-                        <div class="card-head">
-                            <div class="section-title"><div class="section-icon">📚</div>Course Breakdown</div>
-                        </div>
-                        <div id="courseBreakdown">
-                            <div class="empty-state"><div class="ei">📚</div><p>Loading enrolled courses…</p></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── SECTION: Mark Attendance ── -->
-            <div id="section-scan" style="display:none;">
-                <div class="page-head">
-                    <div class="eyebrow">Mark Attendance</div>
-                    <h1>Scan or Enter Token</h1>
-                    <p>Type the 12-character token your teacher displays, or scan the QR code with your camera.</p>
-                </div>
-
-                <div class="card" style="max-width:480px;">
-                    <button type="button" class="btn btn-sky btn-full" id="scanCamBtn"
-                            style="margin-bottom:1.25rem;display:none;">
-                        📷 Scan QR with Camera
-                    </button>
-                    <form id="scanForm">
-                        <div class="form-group">
-                            <label class="form-label" for="tokenInput">Attendance Token</label>
-                            <input class="form-input scan-field" id="tokenInput"
-                                   placeholder="A1B2C3D4E5F6" maxlength="12"
-                                   autocomplete="off" autocorrect="off" autocapitalize="characters"
-                                   spellcheck="false" required>
-                            <div class="form-hint">Tokens are 12 characters and expire in 30 seconds.</div>
-                        </div>
-                        <div id="scanNotice" class="notice"></div>
-                        <button type="submit" class="btn btn-primary btn-full btn-lg" id="scanBtn" style="margin-top:0.75rem;">
-                            ✅ Submit Token
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- ── SECTION: Enroll ── -->
-            <div id="section-enroll" style="display:none;">
-                <div class="page-head">
-                    <div class="eyebrow">Course Registration</div>
-                    <h1>Enroll in a Course</h1>
-                    <p>Browse available lectures and register yourself.</p>
-                </div>
-
-                <div class="g2" style="align-items:start;">
-                    <div class="card">
-                        <div class="card-head">
-                            <div class="section-title"><div class="section-icon">➕</div>Available Courses</div>
-                        </div>
-                        <form id="enrollForm">
-                            <div class="form-group">
-                                <label class="form-label" for="enrollSel">Select Course</label>
-                                <select class="form-select" id="enrollSel" required>
-                                    <option value="">Loading…</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-full">Enroll Now →</button>
-                        </form>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-head">
-                            <div class="section-title"><div class="section-icon">📋</div>My Enrollments</div>
-                        </div>
-                        <div id="enrolledList">
-                            <div class="empty-state"><div class="ei">📚</div><p>Loading…</p></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div><!-- /.page -->
-    </div><!-- /.main -->
+    </div><!-- /.page -->
+  </div><!-- /.main -->
 </div><!-- /.app-shell -->
 
-<!-- Camera scanner overlay -->
+<!-- QR camera scanner overlay -->
 <div class="scanner-overlay" id="scannerOverlay">
-    <div class="scanner-box">
-        <h2>Point at QR Code</h2>
-        <p>Hold steady — the token fills in automatically.</p>
-        <video id="scanVideo" playsinline muted></video>
-        <canvas id="scanCanvas" style="display:none;"></canvas>
-        <button type="button" class="btn btn-ghost" id="scanCancel" style="margin-top:1rem;width:100%;">Cancel</button>
-    </div>
+  <div class="scanner-box">
+    <h2>Scan QR Code</h2>
+    <p>Point your camera at the QR code shown by your faculty.</p>
+    <video id="qrVideo" autoplay muted playsinline style="border-radius:var(--r-md);background:#000;"></video>
+    <button class="btn btn-ghost btn-full" style="margin-top:0.875rem;" onclick="closeScanner()">Cancel</button>
+  </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.js"></script>
 <script src="/app.js"></script>
 <script>
-(function() {
-    'use strict';
-    SAMS.initTheme();
-    SAMS.requireAuth();
+(function () {
+  'use strict';
+  SAMS.initTheme();
+  SAMS.requireAuth();
 
-    const CIRC = 2 * Math.PI * 68; // r=68 → circumference ≈ 427.26
+  /* ── Section map ── */
+  const SECTIONS = ['overview','courses','threshold','scan','enroll'];
+  const TITLES   = {
+    overview:  'Dashboard',
+    courses:   'My Courses',
+    threshold: 'Threshold',
+    scan:      'Mark Attendance',
+    enroll:    'Enroll'
+  };
 
-    /* ── Populate user info from JWT ── */
-    const tkn  = SAMS.getToken();
-    const pay  = SAMS.decodeJWT(tkn);
-    if (pay && pay.name) {
-        document.getElementById('sidebarName').textContent = pay.name;
-        document.getElementById('sidebarAv').textContent   = pay.name.charAt(0).toUpperCase();
+  let attendanceData = null;
+
+  function gotoSection(name, navEl) {
+    SECTIONS.forEach(s => {
+      const el = document.getElementById('section-' + s);
+      if (el) el.style.display = (s === name ? '' : 'none');
+    });
+    document.querySelectorAll('.nav-item[data-section]').forEach(n => n.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+    else {
+      const btn = document.querySelector(`.nav-item[data-section="${name}"]`);
+      if (btn) btn.classList.add('active');
     }
+    document.getElementById('topbarTitle').textContent = TITLES[name] || name;
+    closeSidebar();
 
-    /* ── Section navigation ── */
-    const topMap = {
-        overview: ['My Attendance',    'Live metrics across all enrolled lectures'],
-        scan:     ['Mark Attendance',  'Submit your teacher\'s attendance token'],
-        enroll:   ['Course Enrollment','Browse and register for available lectures']
-    };
-    function gotoSection(name, el) {
-        document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
-        document.getElementById('section-' + name).style.display = 'block';
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        if (el) el.classList.add('active');
-        const [t, s] = topMap[name] || [name, ''];
-        document.getElementById('topbarTitle').textContent = t;
-        document.getElementById('topbarSub').textContent   = s;
-        if (name === 'enroll') { loadAvailCourses(); loadEnrolledList(); }
+    if (name === 'courses' && attendanceData)   renderCoursesTable(attendanceData.courses || []);
+    if (name === 'threshold' && attendanceData) renderThresholdSection(attendanceData);
+    if (name === 'enroll') loadAvailableCourses();
+  }
+  window.gotoSection = gotoSection;
+
+  /* ── Mobile sidebar ── */
+  function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('backdrop').classList.add('show'); }
+  function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('backdrop').classList.remove('show'); }
+  window.openSidebar  = openSidebar;
+  window.closeSidebar = closeSidebar;
+
+  /* ── Date greeting ── */
+  function setGreeting(name) {
+    const now  = new Date();
+    const hour = now.getHours();
+    const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greetingText').textContent = greet;
+    document.getElementById('greetingName').textContent = name || 'Student';
+    document.getElementById('greetingDate').innerHTML =
+      `${now.toLocaleDateString('en-IN',{weekday:'long'})}<br>${now.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}`;
+  }
+
+  /* ── Load user info ── */
+  async function loadUser() {
+    try {
+      const res  = await SAMS.apiFetch('/api/me');
+      if (!res.ok) return;
+      const data = await res.json();
+      const name = data.name || data.email || 'Student';
+      document.getElementById('sidebarName').textContent = name;
+      document.getElementById('sidebarAv').textContent   = name.charAt(0).toUpperCase();
+      if (data.profile_pic) {
+        document.getElementById('sidebarAv').innerHTML = `<img src="${data.profile_pic}" alt="Avatar">`;
+      }
+      setGreeting(name);
+      document.getElementById('greetingMeta').textContent =
+        [data.roll_number, data.batch_year ? `Batch ${data.batch_year}` : null].filter(Boolean).join(' · ') || 'Student Portal';
+    } catch {
+      const pay = SAMS.decodeJWT(SAMS.getToken());
+      if (pay) setGreeting(pay.name || pay.email || 'Student');
     }
-    window.gotoSection = gotoSection;
+  }
 
-    /* ── Animate count ── */
-    function animCount(id, target) {
+  /* ── Load attendance + populate everything ── */
+  async function loadAttendance() {
+    try {
+      const res  = await SAMS.apiFetch('/api/my-attendance');
+      if (!res.ok) { SAMS.toast('Could not load attendance data.', 'error'); return; }
+      const data = await res.json();
+      attendanceData = data;
+
+      const attended = data.attended_classes || 0;
+      const total    = data.total_classes    || 0;
+      const absent   = data.absent_classes   || 0;
+      const pct      = data.percentage       || 0;
+      const courses  = data.courses          || [];
+
+      /* Stat cards */
+      function setStat(id, val) {
         const el = document.getElementById(id);
-        if (!el) return;
-        el.classList.remove('skel');
-        let n = 0;
-        const step = Math.max(1, Math.ceil(target / 40));
-        const t = setInterval(() => {
-            n = Math.min(n + step, target);
-            el.textContent = n;
-            if (n >= target) clearInterval(t);
-        }, 18);
+        if (el) { el.textContent = val; el.classList.remove('skel'); }
+      }
+      setStat('statAttended', attended);
+      setStat('statTotal',    total);
+      setStat('statAbsent',   absent);
+      setStat('statCourses',  courses.length);
+
+      /* Ring */
+      updateRing(pct, data.status);
+
+      /* Threshold summary on overview */
+      updateThresholdOverview(data);
+
+      /* Course breakdown preview */
+      renderCourseBreakdownPreview(courses);
+
+      /* If already on courses/threshold section, re-render */
+      const active = document.querySelector('.nav-item.active[data-section]')?.dataset.section;
+      if (active === 'courses')   renderCoursesTable(courses);
+      if (active === 'threshold') renderThresholdSection(data);
+      initWhatIf(data);
+
+    } catch (err) {
+      SAMS.toast('Failed to load data.', 'error');
     }
+  }
 
-    /* ── Status helpers ── */
-    function pctColor(p) { return p >= 75 ? 'var(--success)' : p >= 60 ? 'var(--warning)' : 'var(--danger)'; }
-    function pctClass(p) { return p >= 75 ? 'pct-ok' : p >= 60 ? 'pct-warn' : 'pct-bad'; }
-    function pctLabel(p) { return p >= 75 ? '✅ Good Standing' : p >= 60 ? '⚠ At Risk' : '❌ Critical'; }
+  /* ── Attendance ring ── */
+  function updateRing(pct, status) {
+    const CIRC = 2 * Math.PI * 64; // 402.12
+    const offset = CIRC * (1 - pct / 100);
+    const arc = document.getElementById('ringArc');
+    arc.style.strokeDashoffset = offset;
+    arc.className = 'ring-fill ' + getRingClass(pct);
+    document.getElementById('ringPct').textContent = pct + '%';
 
-    /* ── Load attendance stats ── */
-    async function loadStats() {
-        try {
-            const res  = await SAMS.apiFetch('/api/my-attendance');
-            if (!res.ok) return;
-            const data = await res.json();
+    const statusEl = document.getElementById('ringStatus');
+    const { label, color } = getStatusMeta(status, pct);
+    statusEl.textContent = label;
+    statusEl.style.color = color;
+  }
 
-            // Topbar greeting
-            const firstName = (data.name || '').split(' ')[0];
-            document.getElementById('topbarSub').textContent = `Welcome back, ${firstName}!`;
-            // Update sidebar name if not from JWT
-            if (!(pay && pay.name)) {
-                document.getElementById('sidebarName').textContent = data.name || 'Student';
-                document.getElementById('sidebarAv').textContent = (data.name || 'S').charAt(0).toUpperCase();
-            }
+  function getRingClass(pct) {
+    if (pct >= 85) return 'ring-safe';
+    if (pct >= 75) return 'ring-warn';
+    return 'ring-danger';
+  }
 
-            const pct = data.percentage || 0;
-
-            // Animate stat tiles
-            animCount('statAttended', data.attended_classes || 0);
-            animCount('statTotal',    data.total_classes    || 0);
-            animCount('statCourses',  (data.courses || []).length);
-
-            setTimeout(() => {
-                const pEl = document.getElementById('statPct');
-                pEl.classList.remove('skel'); pEl.textContent = pct + '%';
-                pEl.style.color = pctColor(pct);
-            }, 380);
-
-            const statusEl = document.getElementById('statStatus');
-            statusEl.textContent   = pctLabel(pct);
-            statusEl.style.color   = pctColor(pct);
-
-            // Donut ring
-            setTimeout(() => {
-                const offset = CIRC - (pct / 100) * CIRC;
-                document.getElementById('ringArc').style.strokeDashoffset = offset;
-                document.getElementById('ringPct').textContent = pct + '%';
-                const rs = document.getElementById('ringStatus');
-                rs.textContent = pctLabel(pct);
-                rs.style.color = pctColor(pct);
-            }, 200);
-
-            // Course breakdown
-            const bd = document.getElementById('courseBreakdown');
-            if (data.courses && data.courses.length) {
-                bd.innerHTML = data.courses.map(c => {
-                    const p = c.percentage || 0;
-                    const barColor = p >= 75 ? 'var(--success)' : p >= 60 ? 'var(--warning)' : 'var(--danger)';
-                    return `
-                    <div style="padding:0.65rem 0;border-bottom:1px solid var(--border);">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem;">
-                            <div>
-                                <div style="font-size:0.85rem;font-weight:600;color:var(--text-1);">${SAMS.escapeHTML(c.course_name)}</div>
-                                <div style="font-size:0.72rem;color:var(--text-3);">${c.attended || 0}/${c.total || 0} classes</div>
-                            </div>
-                            <span class="course-pct ${pctClass(p)}">${p}%</span>
-                        </div>
-                        <div class="att-bar-wrap">
-                            <div class="att-bar-fill" style="width:${p}%;background:${barColor};"></div>
-                        </div>
-                    </div>`;
-                }).join('');
-            } else {
-                bd.innerHTML = '<div class="empty-state"><div class="ei">📚</div><p>Enroll in courses to see your breakdown.</p></div>';
-            }
-        } catch(e) { console.error(e); }
-    }
-
-    /* ── Token input ── */
-    document.getElementById('tokenInput').addEventListener('input', function() {
-        this.value = this.value.toUpperCase();
-    });
-
-    async function submitToken(value) {
-        const tkn    = value || document.getElementById('tokenInput').value.trim();
-        const btn    = document.getElementById('scanBtn');
-        const notice = document.getElementById('scanNotice');
-        btn.disabled = true; btn.textContent = 'Verifying…';
-        try {
-            const res  = await SAMS.apiFetch('/api/qr/scan', {
-                method:'POST',
-                body: JSON.stringify({ token: tkn })
-            });
-            const data = await res.json();
-            notice.textContent = res.ok
-                ? '✅ ' + (data.message || 'Attendance recorded!')
-                : '❌ ' + (data.error || 'Invalid token.');
-            notice.className = 'notice show ' + (res.ok ? 'success' : 'error');
-            if (res.ok) { document.getElementById('scanForm').reset(); loadStats(); }
-        } catch(e) {
-            if (e.message !== 'unauthorized') { notice.textContent = '❌ Network error.'; notice.className = 'notice show error'; }
-        } finally { btn.disabled = false; btn.textContent = '✅ Submit Token'; }
-    }
-    document.getElementById('scanForm').addEventListener('submit', e => { e.preventDefault(); submitToken(); });
-
-    /* ── Course enrollment ── */
-    async function loadAvailCourses() {
-        const sel = document.getElementById('enrollSel');
-        try {
-            const res = await SAMS.apiFetch('/api/student/available-courses');
-            const cs  = await res.json();
-            sel.innerHTML = cs.length
-                ? '<option value="">— Select a course —</option>' +
-                  cs.map(c => `<option value="${c.course_id}">${SAMS.escapeHTML(c.course_code)} — ${SAMS.escapeHTML(c.course_name)}</option>`).join('')
-                : '<option value="">No new courses available</option>';
-        } catch { console.error('load avail courses failed'); }
-    }
-
-    async function loadEnrolledList() {
-        const list = document.getElementById('enrolledList');
-        try {
-            const res  = await SAMS.apiFetch('/api/my-attendance');
-            const data = await res.json();
-            if (!data.courses || !data.courses.length) {
-                list.innerHTML = '<div class="empty-state"><div class="ei">📚</div><p>Not enrolled in any courses yet.</p></div>';
-                return;
-            }
-            list.innerHTML = data.courses.map(c => `
-                <div class="course-row">
-                    <div class="course-dot"></div>
-                    <div>
-                        <div style="font-size:0.85rem;font-weight:600;color:var(--text-1);">${SAMS.escapeHTML(c.course_name)}</div>
-                        <div style="font-size:0.72rem;color:var(--text-3);">${c.attended||0}/${c.total||0} classes attended</div>
-                    </div>
-                </div>`).join('');
-        } catch { list.innerHTML = '<p style="color:var(--danger);font-size:0.85rem;">Failed to load.</p>'; }
-    }
-
-    document.getElementById('enrollForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const cid = document.getElementById('enrollSel').value;
-        if (!cid) return;
-        try {
-            const res  = await SAMS.apiFetch('/api/student/enroll-course', {
-                method:'POST', body: JSON.stringify({ course_id: +cid, semester: 'Fall 2026' })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                SAMS.toast(data.message, 'success');
-                loadStats(); loadAvailCourses(); loadEnrolledList();
-            } else { SAMS.toast(data.error, 'error'); }
-        } catch { SAMS.toast('Network error.', 'error'); }
-    });
-
-    window.downloadReport = function() {
-        window.open('/api/student/report/pdf?token=' + SAMS.getToken(), '_blank');
+  function getStatusMeta(status, pct) {
+    const map = {
+      safe:           { label: '✓ Safe — Well above threshold', color: 'var(--success)' },
+      near_threshold: { label: '~ Near threshold — stay cautious', color: 'var(--warning)' },
+      at_risk:        { label: '⚠ At risk — attend more classes', color: 'var(--danger)' },
+      critical:       { label: '✕ Critical — immediate action needed', color: 'var(--danger)' },
+      no_classes:     { label: 'No classes recorded yet', color: 'var(--text-3)' }
     };
+    return map[status] || { label: pct + '% attendance', color: 'var(--text-2)' };
+  }
 
-    /* ── QR Camera scanner ── */
-    let scanStream = null, scanRAF = null;
-    function stopScanner() {
-        if (scanRAF) cancelAnimationFrame(scanRAF);
-        if (scanStream) scanStream.getTracks().forEach(t => t.stop());
-        scanStream = null;
-        document.getElementById('scannerOverlay').classList.remove('show');
+  /* ── Threshold overview panel ── */
+  function updateThresholdOverview(data) {
+    const pct  = data.percentage || 0;
+    const stat = data.status || 'no_classes';
+
+    document.getElementById('thrCurrent').textContent = pct + '%';
+
+    const badge = document.getElementById('thrStatusBadge');
+    const badgeMap = {
+      safe:           ['Safe',           'badge badge-safe'],
+      near_threshold: ['Near Threshold', 'badge badge-warn'],
+      at_risk:        ['At Risk',        'badge badge-danger'],
+      critical:       ['Critical',       'badge badge-danger'],
+      no_classes:     ['No Data',        'badge badge-muted']
+    };
+    const [label, cls] = badgeMap[stat] || ['—', 'badge badge-muted'];
+    badge.textContent  = label;
+    badge.className    = cls;
+
+    const fill = document.getElementById('thrBarFill');
+    fill.style.width = Math.min(pct, 100) + '%';
+    fill.className   = 'threshold-bar-fill ' + getBarClass(pct);
+
+    const msg   = document.getElementById('thrMessage');
+    const msgCls = getMsgClass(stat);
+    msg.className = 'threshold-message ' + msgCls;
+    msg.textContent = buildMessage(data);
+  }
+
+  function getBarClass(pct) {
+    if (pct >= 85) return 'bar-safe';
+    if (pct >= 75) return 'bar-warn';
+    return 'bar-danger';
+  }
+
+  function getMsgClass(status) {
+    if (status === 'safe') return 'msg-safe';
+    if (status === 'near_threshold') return 'msg-warn';
+    return 'msg-danger';
+  }
+
+  function buildMessage(data) {
+    const { status, can_miss, need_to_attend, percentage } = data;
+    if (status === 'safe')
+      return `You are safe. You can afford to miss up to ${can_miss} more class${can_miss === 1 ? '' : 'es'} and stay above 75%.`;
+    if (status === 'near_threshold')
+      return `You are at ${percentage}% — just above threshold. You can miss at most ${can_miss} more class${can_miss === 1 ? '' : 'es'}.`;
+    if (status === 'at_risk')
+      return `You are below 75%. You must attend ${need_to_attend} more consecutive class${need_to_attend === 1 ? '' : 'es'} to reach 75%.`;
+    if (status === 'critical')
+      return `Critical: ${percentage}% attendance. You must attend ${need_to_attend} consecutive classes to recover to 75%.`;
+    return 'No attendance data recorded yet for this semester.';
+  }
+
+  /* ── Course breakdown preview (on Overview) ── */
+  function renderCourseBreakdownPreview(courses) {
+    const container = document.getElementById('courseBreakdown');
+    if (!courses.length) {
+      container.innerHTML = `<div class="empty-state"><div class="ei">📚</div><p>No courses enrolled yet. <a href="#" onclick="gotoSection('enroll',null);return false;">Enroll in a course.</a></p></div>`;
+      return;
     }
-    async function startScanner() {
-        const video  = document.getElementById('scanVideo');
-        const canvas = document.getElementById('scanCanvas');
-        const ctx    = canvas.getContext('2d', { willReadFrequently: true });
-        try { scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); }
-        catch { SAMS.toast('Camera access denied.', 'error'); return; }
-        video.srcObject = scanStream;
-        await video.play();
-        document.getElementById('scannerOverlay').classList.add('show');
-        const tick = () => {
-            if (!scanStream) return;
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width  = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0);
-                const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = window.jsQR && window.jsQR(img.data, img.width, img.height);
-                if (code && code.data) {
-                    stopScanner();
-                    document.getElementById('tokenInput').value = code.data.trim().toUpperCase();
-                    submitToken(code.data.trim().toUpperCase());
-                    return;
-                }
-            }
-            scanRAF = requestAnimationFrame(tick);
-        };
-        scanRAF = requestAnimationFrame(tick);
+    // Show first 4 courses as compact rows
+    const shown = courses.slice(0, 4);
+    container.innerHTML = shown.map(c => {
+      const pct = c.percentage || 0;
+      const colorVar = pct >= 85 ? 'var(--success)' : pct >= 75 ? 'var(--warning)' : 'var(--danger)';
+      const barClass = pct >= 85 ? 'safe' : pct >= 75 ? 'warn' : 'danger';
+      return `
+        <div style="padding:0.5rem 0;border-bottom:1px solid var(--border-light);">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:4px;">
+            <div>
+              <span style="font-size:0.6875rem;color:var(--text-3);font-family:var(--font-mono);">${c.course_code}</span>
+              <span style="font-size:0.875rem;font-weight:500;color:var(--text-1);margin-left:0.5rem;">${c.course_name}</span>
+            </div>
+            <span style="font-size:0.875rem;font-weight:700;color:${colorVar};white-space:nowrap;">${pct}%</span>
+          </div>
+          <div class="pct-bar"><div class="pct-bar-track" style="flex:1;"><div class="pct-bar-fill ${barClass}" style="width:${Math.min(pct,100)}%"></div></div></div>
+        </div>`;
+    }).join('');
+    if (courses.length > 4) {
+      container.innerHTML += `<div style="padding:0.625rem 0 0;text-align:center;"><button class="btn btn-ghost btn-sm" onclick="gotoSection('courses',null)">View all ${courses.length} courses</button></div>`;
     }
-    document.getElementById('scanCancel').addEventListener('click', stopScanner);
-    if (window.jsQR && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const btn = document.getElementById('scanCamBtn');
-        btn.style.display = 'flex';
-        btn.addEventListener('click', startScanner);
+  }
+
+  /* ── Full courses table ── */
+  function renderCoursesTable(courses) {
+    const tbody = document.getElementById('courseTableBody');
+    if (!courses.length) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="ei">📚</div><h3>No courses yet</h3><p>Enroll in courses to see your attendance breakdown.</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = courses.map(c => {
+      const pct = c.percentage || 0;
+      const barClass = pct >= 85 ? 'safe' : pct >= 75 ? 'warn' : 'danger';
+      const statMap = {
+        safe:           ['Safe',            'badge-safe'],
+        near_threshold: ['Near Threshold',  'badge-warn'],
+        at_risk:        ['At Risk',         'badge-danger'],
+        critical:       ['Critical',        'badge-danger'],
+        no_classes:     ['No Classes',      'badge-muted']
+      };
+      const [sl, sc] = statMap[c.status] || ['—', 'badge-muted'];
+      return `
+        <tr>
+          <td data-label="Course">
+            <span class="course-code">${c.course_code}</span>
+            <span class="course-name">${c.course_name}</span>
+          </td>
+          <td data-label="Conducted">${c.total}</td>
+          <td data-label="Attended">${c.attended}</td>
+          <td data-label="Absent">${c.absent}</td>
+          <td data-label="Attendance">
+            <div class="pct-bar">
+              <div class="pct-bar-track"><div class="pct-bar-fill ${barClass}" style="width:${Math.min(pct,100)}%"></div></div>
+              <span class="pct-val ${barClass}">${pct}%</span>
+            </div>
+          </td>
+          <td data-label="Status"><span class="badge ${sc}">${sl}</span></td>
+        </tr>`;
+    }).join('');
+  }
+
+  /* ── Threshold detail section ── */
+  function renderThresholdSection(data) {
+    const pct      = data.percentage || 0;
+    const attended = data.attended_classes || 0;
+    const total    = data.total_classes    || 0;
+    const absent   = data.absent_classes   || 0;
+    const stat     = data.status           || 'no_classes';
+    const canMiss  = data.can_miss         || 0;
+    const needAtt  = data.need_to_attend   || 0;
+
+    document.getElementById('thrBigPct').textContent = pct + '%';
+    document.getElementById('thrBigSub').textContent =
+      `${attended} attended / ${total} total classes`;
+
+    // Progress bar
+    ['thrBarFill2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.style.width = Math.min(pct,100)+'%'; el.className='threshold-bar-fill '+getBarClass(pct); }
+    });
+
+    // Big message
+    const bigMsg = document.getElementById('thrBigMsg');
+    bigMsg.className = 'threshold-message ' + getMsgClass(stat);
+    bigMsg.textContent = buildMessage(data);
+
+    // Math breakdown
+    document.getElementById('thrMathAttended').textContent = attended;
+    document.getElementById('thrMathTotal').textContent    = total;
+    document.getElementById('thrMathAbsent').textContent   = absent;
+    document.getElementById('thrFormula').textContent      = `${attended}/${total} × 100 = ${pct}%`;
+
+    // Can miss / need to attend
+    const canMissLabel = document.getElementById('thrCanMissLabel');
+    const canMissVal   = document.getElementById('thrCanMissVal');
+    if (stat === 'safe' || stat === 'near_threshold') {
+      canMissLabel.textContent = 'Classes you can still miss';
+      canMissVal.textContent   = canMiss;
+      canMissVal.style.color   = canMiss <= 2 ? 'var(--warning)' : 'var(--success)';
+    } else if (stat === 'at_risk' || stat === 'critical') {
+      canMissLabel.textContent = 'Classes you must attend consecutively';
+      canMissVal.textContent   = needAtt;
+      canMissVal.style.color   = 'var(--danger)';
+    } else {
+      canMissLabel.textContent = 'No data';
+      canMissVal.textContent   = '—';
     }
 
-    loadStats();
+    // Pre-fill what-if
+    document.getElementById('wifBase').value  = attended;
+    document.getElementById('wifTotal').value = total;
+    calcWhatIf();
+  }
+
+  /* ── What-if calculator ── */
+  function initWhatIf(data) {
+    document.getElementById('wifBase').value  = data.attended_classes || 0;
+    document.getElementById('wifTotal').value = data.total_classes    || 0;
+    ['wifBase','wifTotal','wifAttendMore','wifMissMore'].forEach(id => {
+      document.getElementById(id)?.addEventListener('input', calcWhatIf);
+    });
+    calcWhatIf();
+  }
+
+  function calcWhatIf() {
+    const base    = parseInt(document.getElementById('wifBase').value)      || 0;
+    const total   = parseInt(document.getElementById('wifTotal').value)     || 0;
+    const more    = parseInt(document.getElementById('wifAttendMore').value) || 0;
+    const miss    = parseInt(document.getElementById('wifMissMore').value)   || 0;
+
+    const newAtt  = base + more;
+    const newTot  = total + more + miss;
+    const pct     = newTot === 0 ? 0 : Math.round((newAtt / newTot) * 10000) / 100;
+
+    const resultPct    = document.getElementById('calcResultPct');
+    const resultDetail = document.getElementById('calcResultDetail');
+    const resultBadge  = document.getElementById('calcResultBadge');
+
+    resultPct.textContent = pct + '%';
+    resultDetail.textContent =
+      `${newAtt} attended / ${newTot} conducted${newTot !== total ? ' (projected)' : ''}`;
+
+    const safe = pct >= 75;
+    resultBadge.textContent = safe ? 'Above Threshold' : 'Below Threshold';
+    resultBadge.className   = safe ? 'badge badge-safe' : 'badge badge-danger';
+    resultPct.style.color   = pct >= 85 ? 'var(--success)' : pct >= 75 ? 'var(--warning)' : 'var(--danger)';
+  }
+  window.calcWhatIf = calcWhatIf;
+
+  /* ── QR token scan ── */
+  document.getElementById('scanForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const token = document.getElementById('qrTokenInput').value.trim().toUpperCase();
+    const btn   = document.getElementById('scanBtn');
+    if (!token) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader"></i> Marking…';
+    lucide.createIcons();
+    try {
+      const res  = await SAMS.apiFetch('/api/qr/scan', { method:'POST', body: JSON.stringify({ token }) });
+      const data = await res.json();
+      const notice = document.getElementById('scanNotice');
+      if (res.ok) {
+        notice.textContent = '✓ ' + (data.message || 'Attendance marked successfully.');
+        notice.className   = 'notice show success';
+        document.getElementById('qrTokenInput').value = '';
+        setTimeout(() => loadAttendance(), 1200);
+      } else {
+        notice.textContent = data.error || 'Invalid or expired token.';
+        notice.className   = 'notice show error';
+      }
+    } catch {
+      SAMS.toast('Network error.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="check"></i> Mark Present';
+      lucide.createIcons();
+    }
+  });
+
+  /* ── QR camera scanner ── */
+  let qrStream = null;
+  async function openScanner() {
+    const overlay = document.getElementById('scannerOverlay');
+    overlay.classList.add('show');
+    try {
+      qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      document.getElementById('qrVideo').srcObject = qrStream;
+    } catch {
+      SAMS.toast('Camera access denied or not available.', 'error');
+      closeScanner();
+    }
+  }
+  function closeScanner() {
+    document.getElementById('scannerOverlay').classList.remove('show');
+    if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+    document.getElementById('qrVideo').srcObject = null;
+  }
+  window.openScanner  = openScanner;
+  window.closeScanner = closeScanner;
+
+  /* ── Enroll in course ── */
+  async function loadAvailableCourses() {
+    try {
+      const res   = await SAMS.apiFetch('/api/student/available-courses');
+      const data  = await res.json();
+      const sel   = document.getElementById('courseSelect');
+      sel.innerHTML = '<option value="">— Select a course —</option>';
+      (Array.isArray(data) ? data : []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.course_id;
+        opt.textContent = `${c.course_code} — ${c.course_name}`;
+        sel.appendChild(opt);
+      });
+      if (!data.length) sel.innerHTML = '<option value="">No new courses available</option>';
+    } catch {
+      SAMS.toast('Could not load courses.', 'error');
+    }
+  }
+
+  async function enrollCourse() {
+    const course_id = document.getElementById('courseSelect').value;
+    const semester  = document.getElementById('semesterInput').value.trim();
+    if (!course_id) { SAMS.toast('Please select a course.', 'error'); return; }
+    if (!semester)  { SAMS.toast('Please enter a semester.', 'error'); return; }
+    const btn = document.getElementById('enrollBtn');
+    btn.disabled = true;
+    try {
+      const res  = await SAMS.apiFetch('/api/student/enroll-course', { method:'POST', body: JSON.stringify({ course_id, semester }) });
+      const data = await res.json();
+      const notice = document.getElementById('enrollNotice');
+      if (res.ok) {
+        notice.textContent = '✓ ' + (data.message || 'Enrolled successfully!');
+        notice.className   = 'notice show success';
+        loadAttendance();
+        loadAvailableCourses();
+      } else {
+        notice.textContent = data.error || 'Enrollment failed.';
+        notice.className   = 'notice show error';
+      }
+    } catch {
+      SAMS.toast('Network error.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  window.enrollCourse = enrollCourse;
+
+  /* ── Download PDF report ── */
+  function downloadReport() {
+    const token = SAMS.getToken();
+    if (!token) return;
+    const a = document.createElement('a');
+    a.href = `/api/student/report/pdf?token=${token}`;
+    a.download = 'attendance_report.pdf';
+    a.click();
+  }
+  window.downloadReport = downloadReport;
+
+  /* ── Init ── */
+  loadUser();
+  loadAttendance();
+  lucide.createIcons();
 })();
 </script>
 </body>

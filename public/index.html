@@ -1,327 +1,293 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SAMS — Smart Attendance Management System for universities.">
-    <title>SAMS — Smart Attendance Management</title>
-    <link rel="stylesheet" href="/styles.css">
-    <style>
-        /* Floating particles animation */
-        .particle {
-            position: absolute; border-radius: 50%;
-            background: rgba(99,102,241,0.45); pointer-events: none;
-            animation: floatUp linear infinite;
-        }
-        @keyframes floatUp {
-            0%   { transform: translateY(105vh) scale(0); opacity: 0; }
-            10%  { opacity: 1; }
-            85%  { opacity: 0.4; }
-            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SATT — Student Attendance Threshold Tracker</title>
+  <meta name="description" content="University academic attendance management portal. Students, faculty, and administrators log in here.">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+
 <div class="auth-page">
 
-    <!-- ═══ HERO ═══════════════════════════════════════════ -->
-    <section class="auth-hero">
-        <div id="particles" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;"></div>
+  <!-- ══ LEFT: Academic Identity Panel ═══════════════════════ -->
+  <div class="auth-hero">
+    <div class="hero-brand">
+      <div class="hero-logo">S</div>
+      <div>
+        <div class="hero-logo-text">SATT</div>
+        <span class="hero-logo-sub">Academic Portal</span>
+      </div>
+    </div>
 
-        <!-- Brand -->
-        <div class="hero-brand">
-            <div class="hero-logo">S</div>
-            <div>
-                <div class="hero-logo-text">SAMS</div>
-                <small class="hero-logo-sub">SMART ATTENDANCE SYSTEM</small>
-            </div>
+    <div class="hero-body">
+      <div class="hero-pill">University Attendance System</div>
+      <h1>Track. Manage.<br><em>Graduate on time.</em></h1>
+      <p>Real-time attendance monitoring, threshold alerts, and automated reporting for students, faculty, and administration.</p>
+
+      <div class="hero-features">
+        <div class="hero-feat">
+          <div class="hero-feat-icon">📊</div>
+          <span>Per-subject breakdown with live threshold calculation — know your standing before it's too late.</span>
         </div>
-
-        <!-- Body -->
-        <div class="hero-body">
-            <div class="hero-pill">✦ University-Grade Platform</div>
-            <h1>Every class,<br><em>clearly counted.</em></h1>
-            <p>Secure, role-based attendance tracking for students, faculty, and administrators — built on live sessions and honest data.</p>
-
-            <div class="hero-features">
-                <div class="hero-feat">
-                    <div class="hero-feat-icon">⚡</div>
-                    Live QR tokens that expire automatically
-                </div>
-                <div class="hero-feat">
-                    <div class="hero-feat-icon">📊</div>
-                    Real-time analytics for every stakeholder
-                </div>
-                <div class="hero-feat">
-                    <div class="hero-feat-icon">🔒</div>
-                    Role-scoped access — teachers, students, admins
-                </div>
-                <div class="hero-feat">
-                    <div class="hero-feat-icon">📄</div>
-                    One-click PDF reports, anywhere, anytime
-                </div>
-            </div>
+        <div class="hero-feat">
+          <div class="hero-feat-icon">📷</div>
+          <span>QR-code based session marking — faculty generate, students scan, records are instant.</span>
         </div>
-
-        <!-- Stats -->
-        <div class="hero-stats">
-            <div>
-                <div class="hero-stat-n">100%</div>
-                <div class="hero-stat-l">Secure JWT sessions</div>
-            </div>
-            <div>
-                <div class="hero-stat-n">30s</div>
-                <div class="hero-stat-l">Token auto-expiry</div>
-            </div>
-            <div>
-                <div class="hero-stat-n">3</div>
-                <div class="hero-stat-l">Role types</div>
-            </div>
+        <div class="hero-feat">
+          <div class="hero-feat-icon">📄</div>
+          <span>One-click PDF reports for condonation requests and departmental review.</span>
         </div>
-    </section>
+      </div>
+    </div>
 
-    <!-- ═══ AUTH PANEL ══════════════════════════════════════ -->
-    <section class="auth-panel">
-        <!-- Theme toggle -->
-        <button class="btn-icon theme-corner" id="themeToggle" type="button" aria-label="Toggle theme">☀</button>
+    <div class="hero-stats">
+      <div>
+        <div class="hero-stat-n">75%</div>
+        <div class="hero-stat-l">Required threshold</div>
+      </div>
+      <div>
+        <div class="hero-stat-n">3</div>
+        <div class="hero-stat-l">Role types</div>
+      </div>
+      <div>
+        <div class="hero-stat-n">Real‑time</div>
+        <div class="hero-stat-l">Attendance tracking</div>
+      </div>
+    </div>
+  </div>
 
-        <div class="auth-form-wrap">
-            <!-- Logo -->
-            <div class="auth-top-logo">
-                <div class="auth-logo-sq">S</div>
-                <div>
-                    <div class="auth-logo-label">SAMS</div>
-                    <small class="auth-logo-sub">STUDENT & STAFF PORTAL</small>
-                </div>
-            </div>
+  <!-- ══ RIGHT: Auth Form ═════════════════════════════════════ -->
+  <div class="auth-panel">
+    <button class="theme-corner" id="themeToggle" aria-label="Toggle theme" title="Toggle dark/light mode">☀</button>
 
-            <!-- Tab switcher -->
-            <div class="auth-tabs" role="tablist">
-                <button class="auth-tab active" role="tab" data-section="sign-in">Sign In</button>
-                <button class="auth-tab"        role="tab" data-section="register">Create Account</button>
-            </div>
+    <div class="auth-form-wrap">
 
-            <!-- ── Sign In ── -->
-            <div class="auth-section active" id="sign-in">
-                <div class="auth-title">Welcome back 👋</div>
-                <div class="auth-sub">Use your university email to continue.</div>
-
-                <form id="loginForm" novalidate>
-                    <div class="form-group">
-                        <label class="form-label" for="loginEmail">University Email</label>
-                        <input class="form-input" id="loginEmail" type="email"
-                               placeholder="you@university.edu" autocomplete="username" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="loginPassword">Password</label>
-                        <div class="input-row">
-                            <input class="form-input" id="loginPassword" type="password"
-                                   placeholder="Your password" autocomplete="current-password" required>
-                            <button type="button" class="input-toggle" data-for="loginPassword">Show</button>
-                        </div>
-                    </div>
-                    <div id="loginNotice" class="notice"></div>
-                    <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn"
-                            style="margin-top:1rem;">
-                        Sign In →
-                    </button>
-                </form>
-            </div>
-
-            <!-- ── Register ── -->
-            <div class="auth-section" id="register">
-                <div class="auth-title">Create Account ✨</div>
-                <div class="auth-sub">Choose your role to get started.</div>
-
-                <form id="registerForm" novalidate>
-                    <!-- Role -->
-                    <div class="form-group">
-                        <label class="form-label">I am a</label>
-                        <div class="role-grid">
-                            <div class="role-opt">
-                                <input type="radio" name="role" id="roleStudent" value="student" checked>
-                                <label for="roleStudent"><span class="ico">🎓</span>Student</label>
-                            </div>
-                            <div class="role-opt">
-                                <input type="radio" name="role" id="roleFaculty" value="faculty">
-                                <label for="roleFaculty"><span class="ico">🧑‍🏫</span>Teacher</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="faculty-info" id="facultyInfo">
-                        ℹ️ Teacher accounts require admin approval before you can log in.
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="regName">Full Name</label>
-                        <input class="form-input" id="regName" type="text"
-                               placeholder="Your full name" autocomplete="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="regEmail">University Email</label>
-                        <input class="form-input" id="regEmail" type="email"
-                               placeholder="you@university.edu" autocomplete="username" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="regPassword">Password</label>
-                        <div class="input-row">
-                            <input class="form-input" id="regPassword" type="password"
-                                   placeholder="Min. 8 characters" minlength="8" required
-                                   autocomplete="new-password">
-                            <button type="button" class="input-toggle" data-for="regPassword">Show</button>
-                        </div>
-                        <div class="pw-bar" id="pwBar"><span></span><span></span><span></span></div>
-                        <div class="form-hint" id="pwHint">Use 8+ characters with letters and numbers.</div>
-                    </div>
-
-                    <div id="regNotice" class="notice"></div>
-                    <button type="submit" class="btn btn-primary btn-full btn-lg" id="regBtn"
-                            style="margin-top:1rem;">
-                        Create Account →
-                    </button>
-                </form>
-            </div>
-
-            <div class="auth-footer">🔒 Protected university access · Sessions expire in 8 hours</div>
+      <!-- Institution mark -->
+      <div class="auth-top-logo">
+        <div class="auth-logo-sq">S</div>
+        <div>
+          <div class="auth-logo-label">SATT</div>
+          <span class="auth-logo-sub">Student Attendance Threshold Tracker</span>
         </div>
-    </section>
-</div><!-- /.auth-page -->
+      </div>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin"    onclick="switchTab('login')">Sign In</button>
+        <button class="auth-tab"        id="tabRegister" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <!-- ── LOGIN SECTION ── -->
+      <div class="auth-section active" id="loginSection">
+        <h2 class="auth-title">Welcome back</h2>
+        <p class="auth-sub">Sign in to your university portal account.</p>
+
+        <form id="loginForm">
+          <div class="form-group">
+            <label class="form-label" for="loginEmail">Email address</label>
+            <input class="form-input" id="loginEmail" type="email" placeholder="you@university.edu" autocomplete="email" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="loginPassword">Password</label>
+            <div class="input-row">
+              <input class="form-input" id="loginPassword" type="password" placeholder="Your password" autocomplete="current-password" required>
+              <button type="button" class="input-toggle" id="loginPwToggle" data-for="loginPassword">Show</button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:0.25rem;">
+            Sign In
+          </button>
+        </form>
+        <div id="loginNotice" class="notice"></div>
+      </div>
+
+      <!-- ── REGISTER SECTION ── -->
+      <div class="auth-section" id="registerSection">
+        <h2 class="auth-title">Create an account</h2>
+        <p class="auth-sub">Register with your institutional email address.</p>
+
+        <form id="registerForm">
+          <div class="form-group">
+            <label class="form-label" for="regName">Full name</label>
+            <input class="form-input" id="regName" type="text" placeholder="Your full name" autocomplete="name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="regEmail">Email address</label>
+            <input class="form-input" id="regEmail" type="email" placeholder="you@university.edu" autocomplete="email" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="regPassword">Password</label>
+            <div class="input-row">
+              <input class="form-input" id="regPassword" type="password" placeholder="Min. 8 characters" minlength="8" required>
+              <button type="button" class="input-toggle" data-for="regPassword">Show</button>
+            </div>
+            <div class="pw-bar" id="regPwBar"><span></span><span></span><span></span></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Account type</label>
+            <div class="role-grid">
+              <div class="role-opt">
+                <input type="radio" name="regRole" id="roleStudent" value="student" checked>
+                <label for="roleStudent"><span class="ico">🎓</span> Student</label>
+              </div>
+              <div class="role-opt">
+                <input type="radio" name="regRole" id="roleFaculty" value="faculty">
+                <label for="roleFaculty"><span class="ico">👨‍🏫</span> Faculty</label>
+              </div>
+            </div>
+            <p class="faculty-info" id="facultyNote">Faculty accounts require admin approval before activation.</p>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="registerBtn" style="margin-top:0.25rem;">
+            Create Account
+          </button>
+        </form>
+        <div id="registerNotice" class="notice"></div>
+      </div>
+
+      <div class="auth-footer">
+        Secure · Role-based Access · Session Protected
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 <script>
-(function() {
-    'use strict';
-    SAMS.initTheme();
-    SAMS.consumeFlash();
-
-    /* ── Particles ── */
-    (function spawnParticles() {
-        const c = document.getElementById('particles');
-        if (!c) return;
-        for (let i = 0; i < 16; i++) {
-            const p = document.createElement('div');
-            p.className = 'particle';
-            const sz = Math.random() * 4 + 2;
-            p.style.cssText = [
-                `width:${sz}px`,`height:${sz}px`,
-                `left:${Math.random()*100}%`,
-                `animation-duration:${14 + Math.random()*10}s`,
-                `animation-delay:${Math.random()*12}s`,
-                `opacity:${0.2 + Math.random()*0.35}`
-            ].join(';');
-            c.appendChild(p);
-        }
-    })();
-
-    /* ── Tab switching ── */
-    const tabs = document.querySelectorAll('.auth-tab');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
-            document.querySelectorAll('.auth-section').forEach(s => s.classList.remove('active'));
-            tab.classList.add('active');
-            tab.setAttribute('aria-selected','true');
-            document.getElementById(tab.dataset.section).classList.add('active');
-        });
-    });
-
-    /* ── Password toggles ── */
-    document.querySelectorAll('.input-toggle').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const inp = document.getElementById(btn.dataset.for);
-            const show = inp.type === 'text';
-            inp.type = show ? 'password' : 'text';
-            btn.textContent = show ? 'Show' : 'Hide';
-        });
-    });
-
-    /* ── Faculty info note ── */
-    document.querySelectorAll('input[name="role"]').forEach(r => {
-        r.addEventListener('change', () => {
-            const fi = document.getElementById('facultyInfo');
-            fi.classList.toggle('show', r.value === 'faculty' && r.checked);
-        });
-    });
-
-    /* ── Password strength ── */
-    document.getElementById('regPassword').addEventListener('input', function() {
-        const v = this.value;
-        let s = 0;
-        if (v.length >= 8) s++;
-        if (/\d/.test(v) && /[a-zA-Z]/.test(v)) s++;
-        if (v.length >= 12 && /[^a-zA-Z0-9]/.test(v)) s++;
-        const bar  = document.getElementById('pwBar');
-        const hint = document.getElementById('pwHint');
-        bar.className = 'pw-bar' + (v ? ['',' weak',' fair',' strong'][s] : '');
-        hint.textContent = !v ? 'Use 8+ characters with letters and numbers.'
-            : s <= 1 ? '⚠ Weak — add numbers or a symbol.'
-            : s === 2 ? '~ Fair — make it a bit longer.'
-            : '✓ Strong password!';
-    });
-
-    /* ── Notice helper ── */
-    function notice(id, msg, type) {
-        const el = document.getElementById(id);
-        el.textContent = msg;
-        el.className   = 'notice show ' + type;
+(function () {
+  'use strict';
+  SAMS.initTheme();
+  if (SAMS.getToken()) {
+    // Already logged in — redirect based on stored role
+    const pay = SAMS.decodeJWT(SAMS.getToken());
+    if (pay && pay.role) {
+      const dest = { admin: '/admin/admin_dashboard.html', faculty: '/faculty/faculty_dashboard.html', student: '/student/student_dashboard.html' };
+      window.location.href = dest[pay.role] || '/student/student_dashboard.html';
     }
+  }
 
-    /* ── Login ── */
-    document.getElementById('loginForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const btn = document.getElementById('loginBtn');
-        btn.disabled = true; btn.textContent = 'Signing in…';
-        try {
-            const res  = await fetch('/login', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({
-                    email:    document.getElementById('loginEmail').value.trim(),
-                    password: document.getElementById('loginPassword').value
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                SAMS.setToken(data.token);
-                const dest = data.role === 'admin'   ? '/admin/admin_dashboard.html'
-                           : data.role === 'faculty' ? '/faculty/faculty_dashboard.html'
-                                                     : '/student/student_dashboard.html';
-                window.location.href = dest;
-            } else {
-                notice('loginNotice', data.error || 'Invalid credentials.', 'error');
-            }
-        } catch { notice('loginNotice', 'Network error. Try again.', 'error'); }
-        finally { btn.disabled = false; btn.textContent = 'Sign In →'; }
-    });
+  /* ── Tab switcher ── */
+  function switchTab(tab) {
+    document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+    document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+    document.getElementById('loginSection').classList.toggle('active', tab === 'login');
+    document.getElementById('registerSection').classList.toggle('active', tab === 'register');
+  }
+  window.switchTab = switchTab;
 
-    /* ── Register ── */
-    document.getElementById('registerForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const btn = document.getElementById('regBtn');
-        btn.disabled = true; btn.textContent = 'Creating account…';
-        const role = document.querySelector('input[name="role"]:checked').value;
-        try {
-            const res  = await fetch('/register', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({
-                    name:     document.getElementById('regName').value.trim(),
-                    email:    document.getElementById('regEmail').value.trim(),
-                    password: document.getElementById('regPassword').value,
-                    role
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                notice('regNotice', data.message || 'Account created! You can now sign in.', 'success');
-                document.getElementById('registerForm').reset();
-                document.getElementById('pwBar').className = 'pw-bar';
-                setTimeout(() => document.querySelector('[data-section="sign-in"]').click(), 1800);
-            } else {
-                notice('regNotice', data.error || 'Registration failed.', 'error');
-            }
-        } catch { notice('regNotice', 'Network error. Try again.', 'error'); }
-        finally { btn.disabled = false; btn.textContent = 'Create Account →'; }
+  /* ── Password toggles ── */
+  document.querySelectorAll('.input-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inp = document.getElementById(btn.dataset.for);
+      if (!inp) return;
+      const showing = inp.type === 'text';
+      inp.type = showing ? 'password' : 'text';
+      btn.textContent = showing ? 'Show' : 'Hide';
     });
+  });
+
+  /* ── Password strength ── */
+  document.getElementById('regPassword').addEventListener('input', function () {
+    const v = this.value;
+    let s = 0;
+    if (v.length >= 8) s++;
+    if (/\d/.test(v) && /[a-zA-Z]/.test(v)) s++;
+    if (v.length >= 12 && /[^a-zA-Z0-9]/.test(v)) s++;
+    document.getElementById('regPwBar').className = 'pw-bar' + (v ? ['',' weak',' fair',' strong'][s] : '');
+  });
+
+  /* ── Faculty note ── */
+  document.querySelectorAll('input[name="regRole"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const note = document.getElementById('facultyNote');
+      note.classList.toggle('show', r.value === 'faculty' && r.checked);
+    });
+  });
+
+  /* ── Notice helper ── */
+  function setNotice(id, msg, type) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = 'notice show ' + type;
+  }
+  function clearNotice(id) {
+    document.getElementById(id).className = 'notice';
+  }
+
+  /* ── LOGIN ── */
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    clearNotice('loginNotice');
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    try {
+      const res  = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email:    document.getElementById('loginEmail').value.trim(),
+          password: document.getElementById('loginPassword').value
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        localStorage.setItem('sams_token', data.token);
+        const dest = { admin: '/admin/admin_dashboard.html', faculty: '/faculty/faculty_dashboard.html', student: '/student/student_dashboard.html' };
+        window.location.href = dest[data.role] || '/student/student_dashboard.html';
+      } else {
+        setNotice('loginNotice', data.error || 'Login failed. Check your credentials.', 'error');
+      }
+    } catch {
+      setNotice('loginNotice', 'Network error. Please try again.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  });
+
+  /* ── REGISTER ── */
+  document.getElementById('registerForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    clearNotice('registerNotice');
+    const role = document.querySelector('input[name="regRole"]:checked')?.value || 'student';
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+    btn.textContent = 'Creating account…';
+    try {
+      const res  = await fetch('/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name:     document.getElementById('regName').value.trim(),
+          email:    document.getElementById('regEmail').value.trim(),
+          password: document.getElementById('regPassword').value,
+          role
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (role === 'faculty') {
+          setNotice('registerNotice', '✓ Account created. Please wait for admin approval.', 'success');
+          document.getElementById('registerForm').reset();
+        } else if (data.token) {
+          localStorage.setItem('sams_token', data.token);
+          window.location.href = '/student/student_dashboard.html';
+        } else {
+          setNotice('registerNotice', '✓ Account created. You can now sign in.', 'success');
+          switchTab('login');
+        }
+      } else {
+        setNotice('registerNotice', data.error || 'Registration failed.', 'error');
+      }
+    } catch {
+      setNotice('registerNotice', 'Network error. Please try again.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+    }
+  });
 })();
 </script>
 </body>

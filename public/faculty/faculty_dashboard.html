@@ -1,397 +1,666 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Faculty Portal — SAMS</title>
-    <link rel="stylesheet" href="/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Dashboard — SATT</title>
+  <meta name="description" content="Faculty attendance management dashboard — generate QR tokens, mark attendance, and manage courses.">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <style>
+    /* Faculty-specific additions */
+    .token-display {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: 0.25em;
+      color: var(--text-1);
+      font-family: var(--font-mono);
+      text-align: center;
+      padding: 1rem 0;
+    }
+    .token-timer-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: var(--r-full);
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .token-timer-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      transition: width 1s linear;
+      border-radius: var(--r-full);
+    }
+    .attend-summary {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg-hover);
+      border-radius: var(--r-md);
+      margin-bottom: 0.875rem;
+    }
+    .attend-summary-val { font-size: 1.25rem; font-weight: 700; color: var(--text-1); }
+    .attend-summary-lbl { font-size: 0.75rem; color: var(--text-3); }
+    .search-wrap { position: relative; }
+    .search-wrap svg {
+      position: absolute; left: 0.625rem; top: 50%;
+      transform: translateY(-50%);
+      width: 14px; height: 14px;
+      color: var(--text-3); pointer-events: none;
+    }
+    .search-wrap input { padding-left: 2rem; }
+  </style>
 </head>
 <body>
 <div class="app-shell">
 
-    <!-- ═══ SIDEBAR ════════════════════════════════════════ -->
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-head">
-            <div class="sidebar-logo">S</div>
-            <div>
-                <div class="sidebar-title">SAMS</div>
-                <span class="sidebar-role">Faculty Portal</span>
-            </div>
+  <!-- ══ SIDEBAR ════════════════════════════════════════════== -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <div class="sidebar-logo">S</div>
+      <div>
+        <div class="sidebar-title">SATT</div>
+        <span class="sidebar-role">Faculty Portal</span>
+      </div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-group-label">Session</div>
+      <button class="nav-item active" data-section="live" onclick="gotoSection('live',this)">
+        <i data-lucide="zap"></i><span>Live Session</span>
+      </button>
+      <button class="nav-item" data-section="manual" onclick="gotoSection('manual',this)">
+        <i data-lucide="check-square"></i><span>Mark Attendance</span>
+      </button>
+
+      <div class="nav-group-label">Courses</div>
+      <button class="nav-item" data-section="courses" onclick="gotoSection('courses',this)">
+        <i data-lucide="book-open"></i><span>My Courses</span>
+      </button>
+      <button class="nav-item" data-section="assign" onclick="gotoSection('assign',this)">
+        <i data-lucide="plus-circle"></i><span>Assign Course</span>
+      </button>
+
+      <div class="nav-group-label">Account</div>
+      <button class="nav-item" onclick="window.location.href='/profile.html'">
+        <i data-lucide="user"></i><span>Profile</span>
+      </button>
+      <button class="nav-item" onclick="SAMS.logout()">
+        <i data-lucide="log-out"></i><span>Sign Out</span>
+      </button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div class="user-pill">
+        <div class="user-av" id="sidebarAv">F</div>
+        <div>
+          <div class="user-name" id="sidebarName">Loading…</div>
+          <div class="user-role-txt">Faculty</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="sidebar-backdrop" id="backdrop" onclick="closeSidebar()"></div>
+
+  <!-- ══ MAIN ══════════════════════════════════════════════════ -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="menuBtn" onclick="openSidebar()" aria-label="Menu">
+          <i data-lucide="menu"></i>
+        </button>
+        <div class="topbar-info">
+          <h2 id="topbarTitle">Live Session</h2>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost btn-sm" onclick="downloadReport()" title="Download attendance report">
+          <i data-lucide="download"></i> Report
+        </button>
+        <button class="btn-icon" id="themeToggle" aria-label="Toggle theme"></button>
+      </div>
+    </header>
+
+    <div class="page">
+
+      <!-- ══ LIVE SESSION ════════════════════════════════════= -->
+      <div id="section-live">
+        <div class="page-head">
+          <div class="eyebrow">Attendance</div>
+          <h1>Live QR Session</h1>
+          <p>Generate a QR token for students to scan and mark themselves present.</p>
         </div>
 
-        <div class="sidebar-nav">
-            <div class="nav-group-label">Workspace</div>
-            <button class="nav-item active" id="nav-session"    onclick="gotoSection('session',this)">
-                <span class="nav-icon">⚡</span> Live Session
-            </button>
-            <button class="nav-item" id="nav-attendance" onclick="gotoSection('attendance',this)">
-                <span class="nav-icon">✅</span> Mark Attendance
-            </button>
-            <button class="nav-item" id="nav-courses"    onclick="gotoSection('courses',this)">
-                <span class="nav-icon">📚</span> My Courses
-            </button>
+        <div style="max-width:680px;display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <!-- Controls card -->
+          <div class="card" style="grid-column:1/-1;">
+            <div class="section-head" style="margin-bottom:1rem;">
+              <div class="card-title">Start a Session</div>
+              <div class="section-icon"><i data-lucide="zap"></i></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="liveCourseSelect">Select Course</label>
+              <select class="form-select" id="liveCourseSelect">
+                <option value="">Loading your courses…</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="liveDuration">Token Duration (minutes)</label>
+              <select class="form-select" id="liveDuration">
+                <option value="5">5 minutes</option>
+                <option value="10" selected>10 minutes</option>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:0.625rem;">
+              <button class="btn btn-primary" id="generateBtn" onclick="generateQR()">
+                <i data-lucide="qr-code"></i> Generate QR
+              </button>
+              <button class="btn btn-ghost" id="stopBtn" onclick="stopSession()" style="display:none;">
+                <i data-lucide="square"></i> Stop Session
+              </button>
+            </div>
+          </div>
 
-            <div class="nav-group-label" style="margin-top:0.5rem;">Account</div>
-            <button class="nav-item" onclick="window.location.href='/profile.html'">
-                <span class="nav-icon">👤</span> My Profile
-            </button>
-            <button class="nav-item" onclick="SAMS.logout()">
-                <span class="nav-icon">🚪</span> Sign Out
-            </button>
+          <!-- Active token card -->
+          <div class="card" id="tokenCard" style="grid-column:1/-1;display:none;">
+            <div class="section-head" style="margin-bottom:0.5rem;">
+              <div class="card-title">Active Session Token</div>
+              <span class="badge badge-safe" id="tokenStatus">Live</span>
+            </div>
+            <div class="token-display" id="tokenDisplay">———</div>
+            <div class="token-timer-bar">
+              <div class="token-timer-bar-fill" id="timerBarFill" style="width:100%"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:0.375rem;">
+              <span style="font-size:0.75rem;color:var(--text-3);">Expires in</span>
+              <span style="font-size:0.75rem;font-weight:600;color:var(--text-2);" id="timerDisplay">—:——</span>
+            </div>
+
+            <!-- QR code container -->
+            <div class="qr-wrap" id="qrContainer" style="margin-top:1rem;min-height:180px;justify-content:center;">
+              <div id="qrCode" style="display:flex;align-items:center;justify-content:center;width:160px;height:160px;background:var(--bg-hover);border-radius:var(--r-md);color:var(--text-3);font-size:0.8125rem;">Generating…</div>
+            </div>
+
+            <div class="token-meta" style="margin-top:0.875rem;">
+              <div style="font-size:0.75rem;color:var(--text-3);" id="liveCourseLabel">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ MARK ATTENDANCE (Manual) ══════════════════════== -->
+      <div id="section-manual" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Attendance</div>
+          <h1>Manual Attendance</h1>
+          <p>Select a course and mark student attendance for today's session.</p>
         </div>
 
-        <div class="sidebar-foot">
-            <div class="user-pill">
-                <div class="user-av" id="sidebarAv">F</div>
-                <div>
-                    <div class="user-name" id="sidebarName">Loading…</div>
-                    <div class="user-role-txt">Faculty</div>
-                </div>
+        <div style="max-width:720px;">
+          <div class="card" style="margin-bottom:1rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" for="manCourseSelect">Course</label>
+              <select class="form-select" id="manCourseSelect" onchange="loadStudents()">
+                <option value="">— Select a course —</option>
+              </select>
             </div>
+          </div>
+
+          <div class="card" id="manStudentCard" style="display:none;">
+            <div class="section-head" style="margin-bottom:0.875rem;">
+              <div class="card-title" id="manCourseTitle">Students</div>
+              <div style="display:flex;gap:0.5rem;">
+                <button class="btn btn-ghost btn-sm" onclick="selectAll(true)">All Present</button>
+                <button class="btn btn-ghost btn-sm" onclick="selectAll(false)">All Absent</button>
+              </div>
+            </div>
+
+            <!-- Search -->
+            <div class="search-wrap" style="margin-bottom:0.875rem;">
+              <i data-lucide="search"></i>
+              <input class="form-input att-search-input" type="text" id="studentSearch"
+                placeholder="Search by name or roll number…"
+                oninput="filterStudents(this.value)" style="width:100%;padding-left:2rem;">
+            </div>
+
+            <!-- Attendance summary -->
+            <div class="attend-summary" id="attendSummary">
+              <div><div class="attend-summary-val" id="sumPresent">0</div><div class="attend-summary-lbl">Present</div></div>
+              <div style="width:1px;height:28px;background:var(--border);"></div>
+              <div><div class="attend-summary-val" id="sumAbsent">0</div><div class="attend-summary-lbl">Absent</div></div>
+              <div style="width:1px;height:28px;background:var(--border);"></div>
+              <div><div class="attend-summary-val" id="sumTotal">0</div><div class="attend-summary-lbl">Total</div></div>
+            </div>
+
+            <div class="chk-list" id="studentList">
+              <div class="empty-state"><div class="ei">👥</div><p>Select a course to load students.</p></div>
+            </div>
+
+            <div style="margin-top:1rem;display:flex;gap:0.625rem;align-items:center;">
+              <button class="btn btn-primary" id="submitAttBtn" onclick="submitAttendance()">
+                <i data-lucide="save"></i> Save Attendance
+              </button>
+              <span style="font-size:0.8125rem;color:var(--text-3);" id="submitNote">Saving will create a new session record.</span>
+            </div>
+            <div id="manNotice" class="notice"></div>
+          </div>
         </div>
-    </nav>
+      </div>
 
-    <!-- ═══ MAIN ════════════════════════════════════════════ -->
-    <div class="main">
-        <header class="topbar">
-            <div class="topbar-info">
-                <h2 id="topbarTitle">Live Session</h2>
-                <p id="topbarSub">Faculty workspace</p>
+      <!-- ══ MY COURSES ═════════════════════════════════════= -->
+      <div id="section-courses" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic</div>
+          <h1>My Courses</h1>
+          <p>Courses assigned to you this semester.</p>
+        </div>
+
+        <div class="card" style="padding:0;max-width:720px;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="section-title">
+              <div class="section-icon"><i data-lucide="book-open"></i></div>
+              Assigned Courses
             </div>
-            <div class="topbar-right">
-                <button class="btn-icon" id="themeToggle" aria-label="Toggle theme">☀</button>
-            </div>
-        </header>
+            <button class="btn btn-ghost btn-sm" onclick="gotoSection('assign',null)">
+              <i data-lucide="plus"></i> Assign New
+            </button>
+          </div>
+          <div id="courseListContainer" style="padding:0.25rem 0;">
+            <div class="empty-state"><div class="ei">📚</div><p>Loading courses…</p></div>
+          </div>
+        </div>
+      </div>
 
-        <div class="page">
+      <!-- ══ ASSIGN COURSE ══════════════════════════════════= -->
+      <div id="section-assign" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Course Management</div>
+          <h1>Assign Course</h1>
+          <p>Request assignment to a course for the current semester.</p>
+        </div>
 
-            <!-- ── SECTION: Live Session (QR) ── -->
-            <div id="section-session">
-                <div class="page-head">
-                    <div class="eyebrow">QR Attendance</div>
-                    <h1>Generate a Live Token</h1>
-                    <p>Select a course and generate a QR code. Students scan it or type the token within 30 seconds.</p>
-                </div>
+        <div class="card" style="max-width:480px;">
+          <div class="card-head">
+            <div><div class="card-title">Course Assignment</div></div>
+            <div class="section-icon"><i data-lucide="plus-circle"></i></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="assignCourseSelect">Course</label>
+            <select class="form-select" id="assignCourseSelect">
+              <option value="">Loading…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="assignSemester">Semester</label>
+            <input class="form-input" id="assignSemester" type="text" placeholder="e.g. Fall 2026" required>
+          </div>
+          <button class="btn btn-primary" onclick="assignCourse()">
+            <i data-lucide="check"></i> Request Assignment
+          </button>
+          <div id="assignNotice" class="notice"></div>
+        </div>
+      </div>
 
-                <div class="g2" style="align-items:start;">
-                    <div class="card">
-                        <div class="card-head">
-                            <div class="card-title">Start a Session</div>
-                            <div class="card-sub">Pick the course running right now.</div>
-                        </div>
-                        <form id="sessionForm">
-                            <div class="form-group">
-                                <label class="form-label" for="qrCourse">Select Course</label>
-                                <select class="form-select" id="qrCourse" required>
-                                    <option value="">Loading your courses…</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-full" id="genBtn">
-                                ⚡ Generate Token
-                            </button>
-                        </form>
-                        <div id="sessionNotice" class="notice"></div>
-                    </div>
-
-                    <div id="tokenCard" style="display:none;">
-                        <div class="token-box" id="tokenDisplay">
-                            <div class="qr-wrap" id="qrHolder"></div>
-                            <div class="token-meta">
-                                <div class="token-lbl">Live Attendance Token</div>
-                                <div class="token-code" id="tokenText">——————</div>
-                                <div class="token-timer">
-                                    <div class="timer-spin" id="timerSpin"></div>
-                                    Expires in <strong id="countdown" style="margin-left:3px;">30</strong>s
-                                </div>
-                                <button type="button" class="btn btn-ghost btn-sm" id="copyBtn" style="margin-top:0.85rem;">
-                                    📋 Copy Token
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── SECTION: Mark Attendance (Manual) ── -->
-            <div id="section-attendance" style="display:none;">
-                <div class="page-head">
-                    <div class="eyebrow">Manual Entry</div>
-                    <h1>Mark Attendance</h1>
-                    <p>Select a course, tick present students, and save. You can also download the PDF report.</p>
-                </div>
-
-                <div class="card">
-                    <div class="form-group">
-                        <label class="form-label" for="attCourse">Select Course</label>
-                        <select class="form-select" id="attCourse" onchange="loadStudents(this.value)">
-                            <option value="">— Choose a course —</option>
-                        </select>
-                    </div>
-
-                    <div id="studentListWrap">
-                        <div class="empty-state">
-                            <div class="ei">📋</div>
-                            <p>Select a course to load enrolled students.</p>
-                        </div>
-                    </div>
-
-                    <div id="attActions" style="display:none; margin-top:1.25rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
-                        <button class="btn btn-primary" onclick="saveAttendance()">✅ Save Attendance</button>
-                        <button class="btn btn-ghost"   onclick="downloadReport()">📄 Download PDF</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── SECTION: My Courses ── -->
-            <div id="section-courses" style="display:none;">
-                <div class="page-head">
-                    <div class="eyebrow">Course Management</div>
-                    <h1>My Courses</h1>
-                    <p>View your assigned courses and assign new ones from the catalogue.</p>
-                </div>
-
-                <div class="g2" style="align-items:start;">
-                    <div class="card">
-                        <div class="card-head">
-                            <div class="section-title"><div class="section-icon">📚</div>Assigned to Me</div>
-                        </div>
-                        <div id="myCoursesList">
-                            <div class="empty-state"><div class="ei">📂</div><p>Loading…</p></div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-head">
-                            <div class="section-title"><div class="section-icon">➕</div>Assign a Course</div>
-                            <div class="card-sub" style="margin-top:0.25rem;">Pick from the available catalogue.</div>
-                        </div>
-                        <form id="assignForm">
-                            <div class="form-group">
-                                <label class="form-label" for="availCourse">Available Courses</label>
-                                <select class="form-select" id="availCourse" required>
-                                    <option value="">Loading…</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-full">Assign to Me</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-        </div><!-- /.page -->
-    </div><!-- /.main -->
+    </div><!-- /.page -->
+  </div><!-- /.main -->
 </div><!-- /.app-shell -->
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/app.js"></script>
 <script>
-(function() {
-    'use strict';
-    SAMS.initTheme();
-    SAMS.requireAuth();
+(function () {
+  'use strict';
+  SAMS.initTheme();
+  SAMS.requireAuth();
 
-    let timerInterval = null;
-    let courses = [];
+  const SECTIONS = ['live','manual','courses','assign'];
+  const TITLES   = { live:'Live Session', manual:'Mark Attendance', courses:'My Courses', assign:'Assign Course' };
+  let studentData = [];
+  let timerInterval = null;
 
-    /* ── Populate user info from JWT ── */
-    const token   = SAMS.getToken();
-    const payload = SAMS.decodeJWT(token);
-    if (payload && payload.name) {
-        document.getElementById('sidebarName').textContent = payload.name;
-        document.getElementById('sidebarAv').textContent   = payload.name.charAt(0).toUpperCase();
-    }
-
-    /* ── Section navigation ── */
-    const topTitles = {
-        session:    ['Live Session',    'Generate a QR attendance token for your class'],
-        attendance: ['Mark Attendance', 'Manually record student attendance'],
-        courses:    ['My Courses',      'Manage your assigned course load']
-    };
-    function gotoSection(name, el) {
-        document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
-        document.getElementById('section-' + name).style.display = 'block';
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        if (el) el.classList.add('active');
-        const [t, s] = topTitles[name] || [name, ''];
-        document.getElementById('topbarTitle').textContent = t;
-        document.getElementById('topbarSub').textContent   = s;
-        if (name === 'courses')    { loadMyCourses(); loadAvailableCourses(); }
-        if (name === 'attendance') { populateAttCourses(); }
-    }
-    window.gotoSection = gotoSection;
-
-    /* ── Load courses (used by session & attendance selects) ── */
-    async function loadCourses() {
-        try {
-            const res = await SAMS.apiFetch('/api/faculty/courses');
-            courses   = await res.json();
-            const opts = Array.isArray(courses) && courses.length
-                ? '<option value="">— Select a course —</option>' +
-                  courses.map(c => `<option value="${c.course_id}">${SAMS.escapeHTML(c.course_code)} — ${SAMS.escapeHTML(c.course_name)}</option>`).join('')
-                : '<option value="">No courses assigned yet</option>';
-            document.getElementById('qrCourse').innerHTML  = opts;
-            document.getElementById('attCourse').innerHTML = opts;
-        } catch(e) { console.error(e); }
-    }
-
-    function populateAttCourses() { /* already populated */ }
-
-    /* ── QR token generation ── */
-    document.getElementById('sessionForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const btn    = document.getElementById('genBtn');
-        const notice = document.getElementById('sessionNotice');
-        btn.disabled = true; btn.textContent = '⏳ Generating…';
-        notice.className = 'notice';
-        clearInterval(timerInterval);
-
-        try {
-            const res  = await SAMS.apiFetch('/api/qr/generate', {
-                method:'POST',
-                body: JSON.stringify({ course_id: document.getElementById('qrCourse').value })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                // Render QR
-                const holder = document.getElementById('qrHolder');
-                holder.innerHTML = '';
-                if (window.QRCode) {
-                    new QRCode(holder, { text: data.token, width:140, height:140, colorDark:'#1E1B4B', colorLight:'#ffffff' });
-                }
-                document.getElementById('tokenText').textContent = data.token;
-                document.getElementById('tokenCard').style.display = 'block';
-                document.getElementById('tokenText').style.opacity = '1';
-                document.getElementById('timerSpin').style.display = 'block';
-
-                let secs = 30;
-                document.getElementById('countdown').textContent = secs;
-                timerInterval = setInterval(() => {
-                    secs--;
-                    document.getElementById('countdown').textContent = Math.max(secs, 0);
-                    if (secs <= 0) {
-                        clearInterval(timerInterval);
-                        document.getElementById('tokenText').style.opacity = '0.3';
-                        document.getElementById('timerSpin').style.display = 'none';
-                        SAMS.toast('Token expired. Generate a new one.', 'info');
-                    }
-                }, 1000);
-            } else {
-                notice.textContent  = data.error || 'Failed to generate token.';
-                notice.className    = 'notice show error';
-                document.getElementById('tokenCard').style.display = 'none';
-            }
-        } catch(err) { if (err.message !== 'unauthorized') { notice.textContent = 'Network error.'; notice.className = 'notice show error'; } }
-        finally { btn.disabled = false; btn.textContent = '⚡ Generate Token'; }
+  /* ── Section nav ── */
+  function gotoSection(name, navEl) {
+    SECTIONS.forEach(s => {
+      const el = document.getElementById('section-' + s);
+      if (el) el.style.display = s === name ? '' : 'none';
     });
+    document.querySelectorAll('.nav-item[data-section]').forEach(n => n.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+    else {
+      const btn = document.querySelector(`.nav-item[data-section="${name}"]`);
+      if (btn) btn.classList.add('active');
+    }
+    document.getElementById('topbarTitle').textContent = TITLES[name] || name;
+    closeSidebar();
+    if (name === 'courses') loadMyCourses();
+    if (name === 'assign')  loadAssignableCourses();
+  }
+  window.gotoSection = gotoSection;
 
-    document.getElementById('copyBtn').addEventListener('click', async () => {
-        const text = document.getElementById('tokenText').textContent;
-        try { await navigator.clipboard.writeText(text); SAMS.toast('Token copied!', 'success', 2000); }
-        catch { SAMS.toast('Select and copy manually.', 'info'); }
-    });
+  /* ── Mobile sidebar ── */
+  function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('backdrop').classList.add('show'); }
+  function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('backdrop').classList.remove('show'); }
+  window.openSidebar  = openSidebar;
+  window.closeSidebar = closeSidebar;
 
-    /* ── Load students for manual attendance ── */
-    window.loadStudents = async function(courseId) {
-        const wrap    = document.getElementById('studentListWrap');
-        const actions = document.getElementById('attActions');
-        if (!courseId) {
-            wrap.innerHTML = '<div class="empty-state"><div class="ei">📋</div><p>Select a course to load enrolled students.</p></div>';
-            actions.style.display = 'none'; return;
+  /* ── Load user ── */
+  async function loadUser() {
+    try {
+      const res  = await SAMS.apiFetch('/api/me');
+      if (!res.ok) return;
+      const data = await res.json();
+      const name = data.name || data.email || 'Faculty';
+      document.getElementById('sidebarName').textContent = name;
+      document.getElementById('sidebarAv').textContent   = name.charAt(0).toUpperCase();
+      if (data.profile_pic) document.getElementById('sidebarAv').innerHTML = `<img src="${data.profile_pic}" alt="Avatar">`;
+    } catch {}
+  }
+
+  /* ── Load courses into dropdowns ── */
+  async function loadCourseDropdowns() {
+    try {
+      const res   = await SAMS.apiFetch('/api/faculty/courses');
+      const data  = await res.json();
+      const courses = Array.isArray(data) ? data : [];
+
+      [document.getElementById('liveCourseSelect'), document.getElementById('manCourseSelect')].forEach(sel => {
+        const placeholder = sel.options[0]?.text || '';
+        sel.innerHTML = `<option value="">— Select a course —</option>`;
+        courses.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.course_id;
+          opt.textContent = `${c.course_code} — ${c.course_name} (${c.semester})`;
+          sel.appendChild(opt);
+        });
+        if (!courses.length) sel.innerHTML = `<option value="">No assigned courses — assign one first</option>`;
+      });
+    } catch {
+      SAMS.toast('Could not load your courses.', 'error');
+    }
+  }
+
+  /* ── Generate QR ── */
+  async function generateQR() {
+    const course_id = document.getElementById('liveCourseSelect').value;
+    const minutes   = parseInt(document.getElementById('liveDuration').value) || 10;
+    if (!course_id) { SAMS.toast('Please select a course.', 'error'); return; }
+
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+
+    try {
+      const res  = await SAMS.apiFetch('/api/qr/generate', { method:'POST', body: JSON.stringify({ course_id, duration_minutes: minutes }) });
+      const data = await res.json();
+      if (!res.ok) { SAMS.toast(data.error || 'Failed to generate session.', 'error'); btn.disabled = false; return; }
+
+      const token = data.token;
+      const expiresAt = new Date(data.expires_at || Date.now() + minutes * 60000);
+
+      // Show token
+      document.getElementById('tokenCard').style.display = '';
+      document.getElementById('tokenDisplay').textContent = token;
+      document.getElementById('stopBtn').style.display = '';
+
+      // Course label
+      const sel = document.getElementById('liveCourseSelect');
+      document.getElementById('liveCourseLabel').textContent =
+        sel.options[sel.selectedIndex]?.text || '';
+
+      // QR code fallback display (text since we don't have a QR library)
+      const qrEl = document.getElementById('qrCode');
+      qrEl.style.fontSize = '1rem';
+      qrEl.style.fontFamily = 'monospace';
+      qrEl.style.fontWeight = '700';
+      qrEl.textContent = token;
+
+      // Countdown timer
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const now  = new Date();
+        const diff = Math.max(0, Math.floor((expiresAt - now) / 1000));
+        const m = Math.floor(diff / 60);
+        const s = diff % 60;
+        document.getElementById('timerDisplay').textContent = `${m}:${String(s).padStart(2,'0')}`;
+        const pct = Math.max(0, (expiresAt - now) / (minutes * 60000) * 100);
+        document.getElementById('timerBarFill').style.width = pct + '%';
+        if (diff === 0) {
+          clearInterval(timerInterval);
+          document.getElementById('tokenStatus').textContent = 'Expired';
+          document.getElementById('tokenStatus').className = 'badge badge-danger';
         }
-        wrap.innerHTML = '<div class="empty-state"><p>Loading students…</p></div>';
-        try {
-            const res      = await SAMS.apiFetch(`/api/faculty/students?course_id=${courseId}`);
-            const students = await res.json();
-            if (!students.length) {
-                wrap.innerHTML = '<div class="empty-state"><div class="ei">👥</div><p>No students enrolled in this course.</p></div>';
-                actions.style.display = 'none'; return;
-            }
-            wrap.innerHTML = `<div class="chk-list">${students.map(s => `
-                <label class="chk-item">
-                    <input type="checkbox" name="sid" value="${s.student_id}">
-                    <div class="chk-box"></div>
-                    <div>
-                        <div class="chk-name">${SAMS.escapeHTML(s.name)}</div>
-                        <div class="chk-roll">${SAMS.escapeHTML(s.roll_number || '')}</div>
-                    </div>
-                </label>`).join('')}</div>`;
-            actions.style.display = 'flex';
-        } catch(e) {
-            wrap.innerHTML = '<div class="empty-state"><p style="color:var(--danger)">Failed to load students.</p></div>';
-        }
-    };
+      }, 1000);
 
-    window.saveAttendance = async function() {
-        const courseId = document.getElementById('attCourse').value;
-        if (!courseId) return SAMS.toast('Select a course first.', 'error');
-        const sids = Array.from(document.querySelectorAll('input[name="sid"]:checked')).map(cb => +cb.value);
-        try {
-            const res  = await SAMS.apiFetch('/api/faculty/mark-attendance', {
-                method:'POST',
-                body: JSON.stringify({ course_id: +courseId, student_ids: sids })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                SAMS.toast(data.message, 'success');
-                document.querySelectorAll('input[name="sid"]').forEach(cb => cb.checked = false);
-            } else { SAMS.toast(data.error, 'error'); }
-        } catch(e) { SAMS.toast('Network error.', 'error'); }
-    };
-
-    window.downloadReport = function() {
-        const cid = document.getElementById('attCourse').value;
-        if (!cid) return SAMS.toast('Select a course first.', 'error');
-        window.open(`/api/faculty/report/pdf?course_id=${cid}&token=${SAMS.getToken()}`, '_blank');
-    };
-
-    /* ── My Courses list ── */
-    async function loadMyCourses() {
-        const list = document.getElementById('myCoursesList');
-        try {
-            const res  = await SAMS.apiFetch('/api/faculty/courses');
-            const data = await res.json();
-            list.innerHTML = data.length
-                ? data.map(c => `
-                    <div class="course-row">
-                        <div class="course-dot"></div>
-                        <div>
-                            <div style="font-size:0.875rem;font-weight:600;color:var(--text-1);">${SAMS.escapeHTML(c.course_name)}</div>
-                            <div class="mono" style="font-size:0.72rem;color:var(--text-3);">${SAMS.escapeHTML(c.course_code)}</div>
-                        </div>
-                    </div>`).join('')
-                : '<div class="empty-state"><div class="ei">📂</div><p>No courses assigned yet.</p></div>';
-        } catch { list.innerHTML = '<p style="color:var(--danger);font-size:0.85rem;">Failed to load.</p>'; }
+    } catch {
+      SAMS.toast('Network error.', 'error');
+      btn.disabled = false;
+    } finally {
+      btn.disabled = false;
     }
+  }
+  window.generateQR = generateQR;
 
-    async function loadAvailableCourses() {
-        const sel = document.getElementById('availCourse');
-        try {
-            const res     = await SAMS.apiFetch('/api/faculty/available-courses');
-            const courses = await res.json();
-            sel.innerHTML = Array.isArray(courses) && courses.length
-                ? '<option value="">— Pick a course —</option>' +
-                  courses.map(c => `<option value="${c.course_id}">${SAMS.escapeHTML(c.course_code)} — ${SAMS.escapeHTML(c.course_name)}</option>`).join('')
-                : '<option value="">No new courses available</option>';
-        } catch { console.error('Could not load available courses'); }
+  function stopSession() {
+    clearInterval(timerInterval);
+    document.getElementById('tokenCard').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('tokenStatus').textContent = 'Live';
+    document.getElementById('tokenStatus').className = 'badge badge-safe';
+  }
+  window.stopSession = stopSession;
+
+  /* ── Load students for manual attendance ── */
+  async function loadStudents() {
+    const course_id = document.getElementById('manCourseSelect').value;
+    if (!course_id) { document.getElementById('manStudentCard').style.display = 'none'; return; }
+
+    document.getElementById('manStudentCard').style.display = '';
+    const sel = document.getElementById('manCourseSelect');
+    document.getElementById('manCourseTitle').textContent =
+      sel.options[sel.selectedIndex]?.text || 'Students';
+    document.getElementById('studentList').innerHTML =
+      `<div class="empty-state"><div class="ei">⏳</div><p>Loading students…</p></div>`;
+
+    try {
+      const res  = await SAMS.apiFetch(`/api/faculty/students?course_id=${course_id}`);
+      const data = await res.json();
+      studentData = Array.isArray(data) ? data : [];
+      renderStudentList(studentData);
+    } catch {
+      SAMS.toast('Could not load students.', 'error');
     }
+    lucide.createIcons();
+  }
+  window.loadStudents = loadStudents;
 
-    document.getElementById('assignForm').addEventListener('submit', async e => {
-        e.preventDefault();
-        const cid = document.getElementById('availCourse').value;
-        if (!cid) return;
-        try {
-            const res  = await SAMS.apiFetch('/api/faculty/assign-course', {
-                method:'POST', body: JSON.stringify({ course_id: +cid })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                SAMS.toast(data.message, 'success');
-                await loadCourses(); loadMyCourses(); loadAvailableCourses();
-            } else { SAMS.toast(data.error, 'error'); }
-        } catch { SAMS.toast('Network error.', 'error'); }
+  function renderStudentList(students) {
+    const list = document.getElementById('studentList');
+    if (!students.length) {
+      list.innerHTML = `<div class="empty-state"><div class="ei">👤</div><p>No students enrolled in this course.</p></div>`;
+      updateSummary();
+      return;
+    }
+    list.innerHTML = students.map((s, i) => `
+      <label class="chk-item" for="stu_${i}">
+        <input type="checkbox" id="stu_${i}" value="${s.student_id}" checked onchange="updateSummary()">
+        <div class="chk-box"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="chk-name">${s.name || 'Student'}</div>
+          <div class="chk-roll">${s.roll_number || s.student_id}</div>
+        </div>
+        <span class="badge badge-safe" id="stuBadge_${i}">Present</span>
+      </label>`
+    ).join('');
+
+    // Update badge on check change
+    students.forEach((_, i) => {
+      document.getElementById('stu_' + i).addEventListener('change', function() {
+        const badge = document.getElementById(`stuBadge_${i}`);
+        badge.textContent = this.checked ? 'Present' : 'Absent';
+        badge.className   = this.checked ? 'badge badge-safe' : 'badge badge-danger';
+        updateSummary();
+      });
+    });
+    updateSummary();
+  }
+
+  function filterStudents(q) {
+    if (!studentData.length) return;
+    const filtered = q ? studentData.filter(s =>
+      (s.name || '').toLowerCase().includes(q.toLowerCase()) ||
+      (s.roll_number || '').toLowerCase().includes(q.toLowerCase())
+    ) : studentData;
+    renderStudentList(filtered);
+  }
+  window.filterStudents = filterStudents;
+
+  function selectAll(present) {
+    document.querySelectorAll('#studentList input[type="checkbox"]').forEach((cb, i) => {
+      cb.checked = present;
+      const badge = document.getElementById(`stuBadge_${i}`);
+      if (badge) { badge.textContent = present ? 'Present' : 'Absent'; badge.className = present ? 'badge badge-safe' : 'badge badge-danger'; }
+    });
+    updateSummary();
+  }
+  window.selectAll = selectAll;
+
+  function updateSummary() {
+    const all  = document.querySelectorAll('#studentList input[type="checkbox"]');
+    const pres = [...all].filter(cb => cb.checked).length;
+    document.getElementById('sumPresent').textContent = pres;
+    document.getElementById('sumAbsent').textContent  = all.length - pres;
+    document.getElementById('sumTotal').textContent   = all.length;
+  }
+
+  async function submitAttendance() {
+    const course_id = document.getElementById('manCourseSelect').value;
+    if (!course_id) { SAMS.toast('Please select a course.', 'error'); return; }
+
+    const records = [];
+    document.querySelectorAll('#studentList input[type="checkbox"]').forEach(cb => {
+      records.push({ student_id: parseInt(cb.value), status: cb.checked ? 'Present' : 'Absent' });
     });
 
-    loadCourses();
+    if (!records.length) { SAMS.toast('No students to mark.', 'error'); return; }
+
+    const btn = document.getElementById('submitAttBtn');
+    btn.disabled = true;
+
+    try {
+      const res  = await SAMS.apiFetch('/api/faculty/mark-attendance', {
+        method: 'POST',
+        body: JSON.stringify({ course_id: parseInt(course_id), records, date: new Date().toISOString().split('T')[0] })
+      });
+      const data = await res.json();
+      const notice = document.getElementById('manNotice');
+      if (res.ok) {
+        notice.textContent = '✓ ' + (data.message || 'Attendance saved successfully.');
+        notice.className   = 'notice show success';
+        SAMS.toast('Attendance saved!', 'success');
+      } else {
+        notice.textContent = data.error || 'Failed to save attendance.';
+        notice.className   = 'notice show error';
+      }
+    } catch {
+      SAMS.toast('Network error.', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  window.submitAttendance = submitAttendance;
+
+  /* ── My Courses list ── */
+  async function loadMyCourses() {
+    const container = document.getElementById('courseListContainer');
+    try {
+      const res   = await SAMS.apiFetch('/api/faculty/courses');
+      const data  = await res.json();
+      const courses = Array.isArray(data) ? data : [];
+      if (!courses.length) {
+        container.innerHTML = `<div class="empty-state"><div class="ei">📚</div><h3>No assigned courses</h3><p>Request a course assignment to get started.</p></div>`;
+        return;
+      }
+      container.innerHTML = courses.map(c => `
+        <div class="course-row" style="padding:0.75rem 1.25rem;">
+          <div class="course-dot"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:0.875rem;color:var(--text-1);">${c.course_name}</div>
+            <div style="font-size:0.75rem;color:var(--text-3);font-family:var(--font-mono);">${c.course_code} · ${c.semester || '—'}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="quickMark(${c.course_id})">Mark Now</button>
+        </div>`
+      ).join('');
+    } catch {
+      container.innerHTML = `<div class="empty-state"><p>Could not load courses.</p></div>`;
+    }
+  }
+
+  function quickMark(courseId) {
+    document.getElementById('manCourseSelect').value = courseId;
+    gotoSection('manual', null);
+    loadStudents();
+  }
+  window.quickMark = quickMark;
+
+  /* ── Assign course ── */
+  async function loadAssignableCourses() {
+    try {
+      const res   = await SAMS.apiFetch('/api/faculty/available-courses');
+      const data  = await res.json();
+      const sel   = document.getElementById('assignCourseSelect');
+      const courses = Array.isArray(data) ? data : [];
+      sel.innerHTML = `<option value="">— Select a course —</option>`;
+      courses.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.course_id;
+        opt.textContent = `${c.course_code} — ${c.course_name}`;
+        sel.appendChild(opt);
+      });
+      if (!courses.length) sel.innerHTML = `<option value="">No courses available</option>`;
+    } catch {
+      SAMS.toast('Could not load courses.', 'error');
+    }
+  }
+
+  async function assignCourse() {
+    const course_id = document.getElementById('assignCourseSelect').value;
+    const semester  = document.getElementById('assignSemester').value.trim();
+    if (!course_id) { SAMS.toast('Please select a course.', 'error'); return; }
+    if (!semester)  { SAMS.toast('Please enter a semester.', 'error'); return; }
+    try {
+      const res  = await SAMS.apiFetch('/api/faculty/assign-course', { method:'POST', body: JSON.stringify({ course_id, semester }) });
+      const data = await res.json();
+      const notice = document.getElementById('assignNotice');
+      if (res.ok) {
+        notice.textContent = '✓ ' + (data.message || 'Course assigned successfully.');
+        notice.className   = 'notice show success';
+        loadCourseDropdowns();
+      } else {
+        notice.textContent = data.error || 'Assignment failed.';
+        notice.className   = 'notice show error';
+      }
+    } catch {
+      SAMS.toast('Network error.', 'error');
+    }
+  }
+  window.assignCourse = assignCourse;
+
+  /* ── Download report ── */
+  function downloadReport() {
+    const token = SAMS.getToken();
+    if (!token) return;
+    const a = document.createElement('a');
+    a.href = `/api/faculty/report/pdf?token=${token}`;
+    a.download = 'faculty_report.pdf';
+    a.click();
+  }
+  window.downloadReport = downloadReport;
+
+  /* ── Init ── */
+  loadUser();
+  loadCourseDropdowns();
+  lucide.createIcons();
 })();
 </script>
 </body>

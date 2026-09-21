@@ -105,7 +105,7 @@
 
     function initTheme() {
         const saved = localStorage.getItem(THEME_KEY);
-        applyTheme(saved || 'dark'); // Default to dark
+        applyTheme(saved || 'light'); // Default to light (academic portal)
 
         // Wire up ALL theme toggle buttons on this page
         document.querySelectorAll('#themeToggle').forEach(btn => {
