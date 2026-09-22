@@ -1,11 +1,10 @@
 {
-  "name": "sams",
+  "name": "satt",
   "version": "1.0.0",
-  "description": "",
+  "description": "Student Attendance Threshold Tracker",
   "main": "server.js",
   "scripts": {
-    "check": "node --check server.js && node --check update_passwords.js",
-    "seed:passwords": "node update_passwords.js",
+    "check": "node --check server.js",
     "start": "node server.js",
     "stop": "taskkill /F /IM node.exe"
   },

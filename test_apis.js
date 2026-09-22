@@ -37,18 +37,18 @@ async function run() {
   console.log('\n── AUTH ──────────────────────────────────────────');
 
   // 1. Admin login
-  const adminLogin = await req('/login', { email: 'admin@university.edu', password: 'admin123' });
+  const adminLogin = await req('/login', { email: 'admin@satt.test', password: 'admin123' });
   check('Admin login (200)', adminLogin.status === 200, JSON.stringify(adminLogin.body));
   const adminToken = adminLogin.body.token;
   check('Admin role', adminLogin.body.role === 'admin');
 
   // 2. Student login
-  const stuLogin = await req('/login', { email: 'student@university.edu', password: 'admin123' });
+  const stuLogin = await req('/login', { email: '25btce001@satt.test', password: 'admin123' });
   check('Student login (200)', stuLogin.status === 200, JSON.stringify(stuLogin.body));
   const stuToken = stuLogin.body.token;
 
   // 3. Faculty login
-  const facLogin = await req('/login', { email: 'prof.smith@university.edu', password: 'admin123' });
+  const facLogin = await req('/login', { email: 'amit.kulkarni@satt.test', password: 'admin123' });
   check('Faculty login (200)', facLogin.status === 200, JSON.stringify(facLogin.body));
   const facToken = facLogin.body.token;
 
