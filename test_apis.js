@@ -97,6 +97,14 @@ async function run() {
   const pending = await req('/api/admin/pending-teachers', null, 'GET', adminToken);
   check('Admin /pending-teachers (200)', pending.status === 200);
 
+  // 13a. Edit Student (Test endpoint existence/auth)
+  const editStu = await req('/api/admin/students/99999', { name: 'Test', roll_number: 'T999', batch_year: 2024 }, 'PUT', adminToken);
+  check('Admin PUT /students/:id (404/200)', editStu.status === 404 || editStu.status === 200);
+
+  // 13b. Edit Faculty (Test endpoint existence/auth)
+  const editFac = await req('/api/admin/faculty/99999', { name: 'Test', employee_id: 'F999', designation: 'Prof' }, 'PUT', adminToken);
+  check('Admin PUT /faculty/:id (404/200)', editFac.status === 404 || editFac.status === 200);
+
   // 14. Unauthorized test
   const unauth = await req('/api/admin/stats', null, 'GET', stuToken);
   check('Student blocked from admin stats (403)', unauth.status === 403);
@@ -129,6 +137,18 @@ async function run() {
   // 20. Faculty available courses
   const facAvail = await req('/api/faculty/available-courses', null, 'GET', facToken);
   check('Faculty /available-courses (200)', facAvail.status === 200);
+
+  // 20a. Faculty students
+  const facStudents = await req('/api/faculty/students?course_id=99999', null, 'GET', facToken);
+  check('Faculty /students (403/200)', facStudents.status === 403 || facStudents.status === 200);
+
+  // 20b. Faculty sessions
+  const facSessions = await req('/api/faculty/sessions?course_id=99999', null, 'GET', facToken);
+  check('Faculty /sessions (403/200)', facSessions.status === 403 || facSessions.status === 200);
+
+  // 20c. Faculty session attendance
+  const facSessAttn = await req('/api/faculty/sessions/99999/attendance', null, 'GET', facToken);
+  check('Faculty /sessions/:id/attendance (403/200)', facSessAttn.status === 403 || facSessAttn.status === 200);
 
   console.log('\n── PDF ───────────────────────────────────────────');
 

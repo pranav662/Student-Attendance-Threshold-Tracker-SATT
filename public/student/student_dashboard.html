@@ -7,6 +7,13 @@
   <meta name="description" content="Student attendance dashboard — view your attendance, courses, and threshold status.">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <script>
+    (function() {
+      var saved = localStorage.getItem('sams_theme');
+      var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    })();
+  </script>
 </head>
 <body>
 <div class="app-shell">
@@ -14,10 +21,10 @@
   <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-head">
-      <div class="sidebar-logo">S</div>
+      <div class="sidebar-logo" style="border-radius:999px;">S</div>
       <div>
         <div class="sidebar-title">SATT</div>
-        <span class="sidebar-role">Student Portal</span>
+        <span class="sidebar-role" style="white-space:normal;line-height:1.2;font-size:0.6rem;">Student Attendance<br>Threshold Tracker</span>
       </div>
     </div>
 
@@ -800,28 +807,53 @@
     calcWhatIf();
   }
 
-  function calcWhatIf() {
-    const base    = parseInt(document.getElementById('wifBase').value)      || 0;
-    const total   = parseInt(document.getElementById('wifTotal').value)     || 0;
-    const more    = parseInt(document.getElementById('wifAttendMore').value) || 0;
-    const miss    = parseInt(document.getElementById('wifMissMore').value)   || 0;
+  let whatIfTimeout = null;
+  async function calcWhatIf() {
+    if (whatIfTimeout) clearTimeout(whatIfTimeout);
+    whatIfTimeout = setTimeout(async () => {
+      const base    = parseInt(document.getElementById('wifBase').value)      || 0;
+      const total   = parseInt(document.getElementById('wifTotal').value)     || 0;
+      const more    = parseInt(document.getElementById('wifAttendMore').value) || 0;
+      const miss    = parseInt(document.getElementById('wifMissMore').value)   || 0;
 
-    const newAtt  = base + more;
-    const newTot  = total + more + miss;
-    const pct     = newTot === 0 ? 0 : Math.round((newAtt / newTot) * 10000) / 100;
+      const newAtt  = base + more;
+      const newTot  = total + more + miss;
 
-    const resultPct    = document.getElementById('calcResultPct');
-    const resultDetail = document.getElementById('calcResultDetail');
-    const resultBadge  = document.getElementById('calcResultBadge');
+      try {
+        const res = await SAMS.apiFetch(`/api/calculate-attendance?attended=${newAtt}&total=${newTot}`);
+        if (!res.ok) return;
+        const data = await res.json();
 
-    resultPct.textContent = pct + '%';
-    resultDetail.textContent =
-      `${newAtt} attended / ${newTot} conducted${newTot !== total ? ' (projected)' : ''}`;
+        const resultPct    = document.getElementById('calcResultPct');
+        const resultDetail = document.getElementById('calcResultDetail');
+        const resultBadge  = document.getElementById('calcResultBadge');
 
-    const safe = pct >= 75;
-    resultBadge.textContent = safe ? 'Above Threshold' : 'Below Threshold';
-    resultBadge.className   = safe ? 'badge badge-safe' : 'badge badge-danger';
-    resultPct.style.color   = pct >= 85 ? 'var(--success)' : pct >= 75 ? 'var(--warning)' : 'var(--danger)';
+        resultPct.textContent = data.percentage + '%';
+        resultDetail.textContent =
+          `${data.attended} attended / ${data.total} conducted${data.total !== total ? ' (projected)' : ''}`;
+
+        const safe = data.status === 'Safe';
+        resultBadge.textContent = safe ? 'Above Threshold' : 'Below Threshold';
+        resultBadge.className   = safe ? 'badge badge-safe' : 'badge badge-danger';
+        resultPct.style.color   = data.percentage >= 85 ? 'var(--success)' : data.percentage >= 75 ? 'var(--warning)' : 'var(--danger)';
+        
+        const detailsContainer = document.getElementById('calcResultDetail').parentElement;
+        let needsText = data.canMiss > 0 ? `Can miss ${data.canMiss} more` : 
+                        data.needToAttend > 0 ? `Must attend next ${data.needToAttend}` : 
+                        'On the edge';
+        
+        let existingNeeds = document.getElementById('calcNeedsText');
+        if (!existingNeeds) {
+          existingNeeds = document.createElement('div');
+          existingNeeds.id = 'calcNeedsText';
+          existingNeeds.style.fontSize = '0.75rem';
+          existingNeeds.style.color = 'var(--text-3)';
+          existingNeeds.style.marginTop = '0.25rem';
+          detailsContainer.appendChild(existingNeeds);
+        }
+        existingNeeds.textContent = needsText;
+      } catch (e) { console.error('What-If error:', e); }
+    }, 150);
   }
   window.calcWhatIf = calcWhatIf;
 

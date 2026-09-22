@@ -7,6 +7,13 @@
   <meta name="description" content="Faculty attendance management dashboard — generate QR tokens, mark attendance, and manage courses.">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <script>
+    (function() {
+      var saved = localStorage.getItem('sams_theme');
+      var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    })();
+  </script>
   <style>
     /* Faculty-specific additions */
     .token-display {
@@ -58,10 +65,10 @@
   <!-- ══ SIDEBAR ════════════════════════════════════════════== -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-head">
-      <div class="sidebar-logo">S</div>
+      <div class="sidebar-logo" style="border-radius:999px;">S</div>
       <div>
         <div class="sidebar-title">SATT</div>
-        <span class="sidebar-role">Faculty Portal</span>
+        <span class="sidebar-role" style="white-space:normal;line-height:1.2;font-size:0.6rem;">Student Attendance<br>Threshold Tracker</span>
       </div>
     </div>
 
@@ -77,6 +84,9 @@
       <div class="nav-group-label">Courses</div>
       <button class="nav-item" data-section="courses" onclick="gotoSection('courses',this)">
         <i data-lucide="book-open"></i><span>My Courses</span>
+      </button>
+      <button class="nav-item" data-section="sessions" onclick="gotoSection('sessions',this)">
+        <i data-lucide="history"></i><span>Past Sessions</span>
       </button>
       <button class="nav-item" data-section="assign" onclick="gotoSection('assign',this)">
         <i data-lucide="plus-circle"></i><span>Assign Course</span>
@@ -274,6 +284,59 @@
         </div>
       </div>
 
+      <!-- ══ SESSIONS ═══════════════════════════════════════= -->
+      <div id="section-sessions" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Attendance</div>
+          <h1>Past Sessions</h1>
+          <p>View and modify attendance for past sessions.</p>
+        </div>
+
+        <div style="max-width:720px;">
+          <div class="card" style="margin-bottom:1rem;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" for="sessionCourseSelect">Course</label>
+              <select class="form-select" id="sessionCourseSelect" onchange="loadPastSessions()">
+                <option value="">— Select a course —</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card" id="sessionsListCard" style="display:none; margin-bottom:1rem;">
+            <div class="section-head" style="margin-bottom:0.875rem;">
+              <div class="card-title">Past Sessions</div>
+            </div>
+            <div id="sessionsListContainer">
+              <div class="empty-state"><div class="ei">📅</div><p>Loading sessions...</p></div>
+            </div>
+          </div>
+
+          <div class="card" id="sessionDetailsCard" style="display:none;">
+            <div class="section-head" style="margin-bottom:0.875rem;">
+              <div class="card-title">Session Attendance</div>
+              <button class="btn btn-ghost btn-sm" onclick="closeSessionDetails()">Back to Sessions</button>
+            </div>
+            
+            <div class="attend-summary" id="sessionAttendSummary">
+              <div><div class="attend-summary-val" id="sessPresent">0</div><div class="attend-summary-lbl">Present</div></div>
+              <div style="width:1px;height:28px;background:var(--border);"></div>
+              <div><div class="attend-summary-val" id="sessAbsent">0</div><div class="attend-summary-lbl">Absent</div></div>
+              <div style="width:1px;height:28px;background:var(--border);"></div>
+              <div><div class="attend-summary-val" id="sessTotal">0</div><div class="attend-summary-lbl">Total</div></div>
+            </div>
+
+            <div class="chk-list" id="sessionStudentList"></div>
+
+            <div style="margin-top:1rem;display:flex;gap:0.625rem;align-items:center;">
+              <button class="btn btn-primary" id="saveSessionBtn" onclick="saveSessionAttendance()">
+                <i data-lucide="save"></i> Update Attendance
+              </button>
+            </div>
+            <div id="sessionNotice" class="notice"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- ══ ASSIGN COURSE ══════════════════════════════════= -->
       <div id="section-assign" style="display:none;">
         <div class="page-head">
@@ -315,9 +378,11 @@
   SAMS.initTheme();
   SAMS.requireAuth();
 
-  const SECTIONS = ['live','manual','courses','assign'];
-  const TITLES   = { live:'Live Session', manual:'Mark Attendance', courses:'My Courses', assign:'Assign Course' };
+  const SECTIONS = ['live','manual','courses','sessions','assign'];
+  const TITLES   = { live:'Live Session', manual:'Mark Attendance', courses:'My Courses', sessions:'Past Sessions', assign:'Assign Course' };
   let studentData = [];
+  let sessionStudentData = [];
+  let currentSessionId = null;
   let timerInterval = null;
 
   /* ── Section nav ── */
@@ -365,7 +430,8 @@
       const data  = await res.json();
       const courses = Array.isArray(data) ? data : [];
 
-      [document.getElementById('liveCourseSelect'), document.getElementById('manCourseSelect')].forEach(sel => {
+      [document.getElementById('liveCourseSelect'), document.getElementById('manCourseSelect'), document.getElementById('sessionCourseSelect')].forEach(sel => {
+        if (!sel) return;
         const placeholder = sel.options[0]?.text || '';
         sel.innerHTML = `<option value="">— Select a course —</option>`;
         courses.forEach(c => {
@@ -645,6 +711,156 @@
     }
   }
   window.assignCourse = assignCourse;
+
+  /* ── Past Sessions ── */
+  async function loadPastSessions() {
+    const courseId = document.getElementById('sessionCourseSelect').value;
+    const listCard = document.getElementById('sessionsListCard');
+    const detailsCard = document.getElementById('sessionDetailsCard');
+    const container = document.getElementById('sessionsListContainer');
+    
+    detailsCard.style.display = 'none';
+    if (!courseId) {
+      listCard.style.display = 'none';
+      return;
+    }
+    
+    listCard.style.display = 'block';
+    container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading sessions...</p></div>`;
+    
+    try {
+      const res = await SAMS.apiFetch(`/api/faculty/sessions?course_id=${courseId}`);
+      const sessions = await res.json();
+      
+      if (!sessions.length) {
+        container.innerHTML = `<div class="empty-state"><div class="ei">📅</div><p>No past sessions found for this course.</p></div>`;
+        return;
+      }
+      
+      container.innerHTML = sessions.map(s => {
+        const dt = new Date(s.session_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        return `
+          <div class="course-row" style="padding:0.75rem 1.25rem;">
+            <div class="course-dot"></div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.875rem;color:var(--text-1);">${dt}</div>
+              <div style="font-size:0.75rem;color:var(--text-3);font-family:var(--font-mono);">Started at: ${s.start_time}</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadSessionAttendance(${s.session_id})">View / Edit</button>
+          </div>
+        `;
+      }).join('');
+    } catch {
+      container.innerHTML = `<div class="empty-state"><p>Could not load sessions.</p></div>`;
+    }
+  }
+
+  async function loadSessionAttendance(sessionId) {
+    currentSessionId = sessionId;
+    document.getElementById('sessionsListCard').style.display = 'none';
+    document.getElementById('sessionDetailsCard').style.display = 'block';
+    const container = document.getElementById('sessionStudentList');
+    container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading attendance...</p></div>`;
+    
+    try {
+      const res = await SAMS.apiFetch(`/api/faculty/sessions/${sessionId}/attendance`);
+      const records = await res.json();
+      sessionStudentData = records;
+      renderSessionStudentList(records);
+    } catch {
+      container.innerHTML = `<div class="empty-state"><p>Could not load session attendance.</p></div>`;
+    }
+  }
+
+  function renderSessionStudentList(records) {
+    const container = document.getElementById('sessionStudentList');
+    if (!records.length) {
+      container.innerHTML = `<div class="empty-state"><div class="ei">👥</div><p>No students found.</p></div>`;
+      updateSessionSummary(0, 0);
+      return;
+    }
+    
+    let present = 0;
+    let absent = 0;
+    
+    container.innerHTML = records.map((r, i) => {
+      const isPresent = r.status === 'Present';
+      if (isPresent) present++; else absent++;
+      return `
+        <label class="chk-item">
+          <input type="checkbox" id="sess_stu_${i}" ${isPresent ? 'checked' : ''}>
+          <div>
+            <div class="chk-name">${escHtml(r.name)}</div>
+            <div class="chk-roll">${escHtml(r.roll_number)}</div>
+          </div>
+        </label>
+      `;
+    }).join('');
+    
+    updateSessionSummary(present, absent);
+    
+    for (let i = 0; i < records.length; i++) {
+      document.getElementById('sess_stu_' + i).addEventListener('change', function() {
+        if (this.checked) { present++; absent--; } else { present--; absent++; }
+        updateSessionSummary(present, absent);
+      });
+    }
+  }
+
+  function updateSessionSummary(p, a) {
+    document.getElementById('sessPresent').textContent = p;
+    document.getElementById('sessAbsent').textContent = a;
+    document.getElementById('sessTotal').textContent = p + a;
+  }
+
+  function closeSessionDetails() {
+    document.getElementById('sessionDetailsCard').style.display = 'none';
+    document.getElementById('sessionsListCard').style.display = 'block';
+    currentSessionId = null;
+    sessionStudentData = [];
+  }
+
+  async function saveSessionAttendance() {
+    if (!currentSessionId || !sessionStudentData.length) return;
+    
+    const records = sessionStudentData.map((s, i) => {
+      const chk = document.getElementById('sess_stu_' + i);
+      return {
+        student_id: s.student_id,
+        status: chk.checked ? 'Present' : 'Absent'
+      };
+    });
+    
+    const btn = document.getElementById('saveSessionBtn');
+    const notice = document.getElementById('sessionNotice');
+    btn.disabled = true;
+    
+    try {
+      const res = await SAMS.apiFetch(`/api/faculty/sessions/${currentSessionId}/attendance`, {
+        method: 'PUT',
+        body: JSON.stringify({ records })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        notice.textContent = '✓ ' + (data.message || 'Attendance updated.');
+        notice.className = 'notice show success';
+        setTimeout(() => { notice.className = 'notice'; closeSessionDetails(); }, 1500);
+      } else {
+        notice.textContent = data.error || 'Failed to update attendance.';
+        notice.className = 'notice show error';
+      }
+    } catch {
+      notice.textContent = 'Network error.';
+      notice.className = 'notice show error';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  window.loadPastSessions = loadPastSessions;
+  window.loadSessionAttendance = loadSessionAttendance;
+  window.closeSessionDetails = closeSessionDetails;
+  window.saveSessionAttendance = saveSessionAttendance;
 
   /* ── Download report ── */
   function downloadReport() {

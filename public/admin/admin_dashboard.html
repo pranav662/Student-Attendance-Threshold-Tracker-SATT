@@ -7,6 +7,13 @@
   <meta name="description" content="SATT Administration Portal — manage students, faculty, courses, departments, and system settings.">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <script>
+    (function() {
+      var saved = localStorage.getItem('sams_theme');
+      var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    })();
+  </script>
   <style>
     /* ── Admin-specific extensions ── */
     .modal-overlay {
@@ -91,10 +98,10 @@
   <!-- ══ SIDEBAR ════════════════════════════════════════════ -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-head">
-      <div class="sidebar-logo">S</div>
+      <div class="sidebar-logo" style="border-radius:999px;">S</div>
       <div>
         <div class="sidebar-title">SATT</div>
-        <span class="sidebar-role">Administration</span>
+        <span class="sidebar-role" style="white-space:normal;line-height:1.2;font-size:0.6rem;">Student Attendance<br>Threshold Tracker</span>
       </div>
     </div>
 
@@ -291,10 +298,11 @@
                   <th>Courses</th>
                   <th>Attendance</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="studentsBody">
-                <tr><td colspan="7"><div class="empty-state"><div class="ei">⏳</div><p>Loading students…</p></div></td></tr>
+                <tr><td colspan="8"><div class="empty-state"><div class="ei">⏳</div><p>Loading students…</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -631,6 +639,66 @@
   </div>
 </div>
 
+<!-- ── Edit Student Modal ── -->
+<div class="modal-overlay" id="editStudentModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">Edit Student</div>
+      <button class="modal-close" onclick="closeEditStudentModal()" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <input type="hidden" id="editStudentId">
+    <div class="form-group">
+      <label class="form-label" for="editStudentName">Student Name</label>
+      <input class="form-input" id="editStudentName" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="editStudentRoll">Roll Number</label>
+      <input class="form-input" id="editStudentRoll" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="editStudentBatch">Batch Year</label>
+      <input class="form-input" id="editStudentBatch" type="number">
+    </div>
+    <div id="editStudentNotice" class="notice"></div>
+    <div style="display:flex;gap:0.625rem;margin-top:1rem;">
+      <button class="btn btn-ghost" onclick="closeEditStudentModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStudentEdit()" id="saveStudentBtn" style="flex:1;">
+        <i data-lucide="save"></i> Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Faculty Modal ── -->
+<div class="modal-overlay" id="editFacultyModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">Edit Faculty</div>
+      <button class="modal-close" onclick="closeEditFacultyModal()" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <input type="hidden" id="editFacultyId">
+    <div class="form-group">
+      <label class="form-label" for="editFacultyName">Faculty Name</label>
+      <input class="form-input" id="editFacultyName" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="editFacultyEmp">Employee ID</label>
+      <input class="form-input" id="editFacultyEmp" type="text">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="editFacultyDesig">Designation</label>
+      <input class="form-input" id="editFacultyDesig" type="text">
+    </div>
+    <div id="editFacultyNotice" class="notice"></div>
+    <div style="display:flex;gap:0.625rem;margin-top:1rem;">
+      <button class="btn btn-ghost" onclick="closeEditFacultyModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFacultyEdit()" id="saveFacultyBtn" style="flex:1;">
+        <i data-lucide="save"></i> Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Confirm Modal ── -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-box" style="max-width:380px;">
@@ -834,7 +902,7 @@
       const rows = data.data || [];
       const tbody = document.getElementById('studentsBody');
       if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">👤</div><h3>No students found</h3><p>${q ? 'No results for "' + escHtml(q) + '".' : 'No students registered yet.'}</p></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ei">👤</div><h3>No students found</h3><p>${q ? 'No results for "' + escHtml(q) + '".' : 'No students registered yet.'}</p></div></td></tr>`;
         document.getElementById('studentsMeta').textContent = '0 results';
         document.getElementById('studentsPager').innerHTML = '';
         return;
@@ -845,6 +913,9 @@
         const pct   = total > 0 ? ((att / total) * 100).toFixed(1) : '—';
         const pctColor = total > 0 ? (pct >= 75 ? 'var(--success)' : 'var(--danger)') : 'var(--text-3)';
         const statusBadge = s.status === 'approved' ? '<span class="badge badge-safe">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+        const safeName = escAttr(s.name);
+        const safeRoll = escAttr(s.roll_number);
+        const safeBatch = escAttr(s.batch_year);
         return `<tr>
           <td data-label="Name"><div style="font-weight:600;">${escHtml(s.name)}</div></td>
           <td data-label="Roll"><span style="font-family:var(--font-mono);font-size:0.8125rem;">${escHtml(s.roll_number)}</span></td>
@@ -853,6 +924,9 @@
           <td data-label="Courses">${s.enrolled_courses}</td>
           <td data-label="Attendance"><span style="font-weight:700;color:${pctColor};">${total > 0 ? pct + '%' : '—'}</span></td>
           <td data-label="Status">${statusBadge}</td>
+          <td data-label="Actions">
+            <button class="btn btn-ghost btn-sm" onclick="openEditStudentModal(${s.student_id}, '${safeName}', '${safeRoll}', '${safeBatch}')">Edit</button>
+          </td>
         </tr>`;
       }).join('');
       document.getElementById('studentsMeta').textContent = `Showing ${rows.length} of ${data.total} students`;
@@ -878,6 +952,10 @@
         const statusBadge = f.status === 'approved' ? '<span class="badge badge-safe">Approved</span>' :
                             f.status === 'pending'   ? '<span class="badge badge-warn">Pending</span>' :
                                                        '<span class="badge badge-danger">Rejected</span>';
+        const safeName = escAttr(f.name);
+        const safeEmp = escAttr(f.employee_id);
+        const safeDesig = escAttr(f.designation);
+        const editBtn = `<button class="btn btn-ghost btn-sm" onclick="openEditFacultyModal(${f.faculty_id}, '${safeName}', '${safeEmp}', '${safeDesig}')">Edit</button>`;
         const toggleAction = f.status === 'approved'
           ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserStatus(${f.user_id},'rejected','Suspend ${escHtml(f.name)}?')">Suspend</button>`
           : `<button class="btn btn-ghost btn-sm" onclick="toggleUserStatus(${f.user_id},'approved','Activate ${escHtml(f.name)}?')">Activate</button>`;
@@ -888,7 +966,7 @@
           <td data-label="Designation">${escHtml(f.designation||'—')}</td>
           <td data-label="Courses">${f.assigned_courses}</td>
           <td data-label="Status">${statusBadge}</td>
-          <td data-label="Actions">${toggleAction}</td>
+          <td data-label="Actions" style="display:flex; gap:0.5rem; align-items:center;">${editBtn} ${toggleAction}</td>
         </tr>`;
       }).join('');
     } catch { SAMS.toast('Could not load faculty.', 'error'); }
@@ -1201,6 +1279,75 @@
   async function executeConfirm() { closeConfirm(); if (confirmCallback) await confirmCallback(); }
   window.closeConfirm  = closeConfirm;
   window.executeConfirm = executeConfirm;
+
+  /* ── Edit Student & Faculty ── */
+  function openEditStudentModal(id, name, roll, batch) {
+    document.getElementById('editStudentId').value = id;
+    document.getElementById('editStudentName').value = name;
+    document.getElementById('editStudentRoll').value = roll;
+    document.getElementById('editStudentBatch').value = batch;
+    document.getElementById('editStudentNotice').className = 'notice';
+    document.getElementById('editStudentModal').classList.add('show');
+    lucide.createIcons();
+  }
+  function closeEditStudentModal() { document.getElementById('editStudentModal').classList.remove('show'); }
+  async function saveStudentEdit() {
+    const id = document.getElementById('editStudentId').value;
+    const body = {
+      name: document.getElementById('editStudentName').value.trim(),
+      roll_number: document.getElementById('editStudentRoll').value.trim(),
+      batch_year: document.getElementById('editStudentBatch').value
+    };
+    const btn = document.getElementById('saveStudentBtn');
+    const notice = document.getElementById('editStudentNotice');
+    btn.disabled = true;
+    try {
+      const res = await SAMS.apiFetch(`/api/admin/students/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+      const data = await res.json();
+      if (res.ok) {
+        showNotice(notice, '✓ ' + data.message, 'success');
+        setTimeout(() => { closeEditStudentModal(); loadStudents(); }, 1000);
+      } else { showNotice(notice, data.error || 'Update failed', 'error'); }
+    } catch { showNotice(notice, 'Network error', 'error'); }
+    finally { btn.disabled = false; }
+  }
+  window.openEditStudentModal = openEditStudentModal;
+  window.closeEditStudentModal = closeEditStudentModal;
+  window.saveStudentEdit = saveStudentEdit;
+
+  function openEditFacultyModal(id, name, emp, desig) {
+    document.getElementById('editFacultyId').value = id;
+    document.getElementById('editFacultyName').value = name;
+    document.getElementById('editFacultyEmp').value = emp;
+    document.getElementById('editFacultyDesig').value = desig;
+    document.getElementById('editFacultyNotice').className = 'notice';
+    document.getElementById('editFacultyModal').classList.add('show');
+    lucide.createIcons();
+  }
+  function closeEditFacultyModal() { document.getElementById('editFacultyModal').classList.remove('show'); }
+  async function saveFacultyEdit() {
+    const id = document.getElementById('editFacultyId').value;
+    const body = {
+      name: document.getElementById('editFacultyName').value.trim(),
+      employee_id: document.getElementById('editFacultyEmp').value.trim(),
+      designation: document.getElementById('editFacultyDesig').value.trim()
+    };
+    const btn = document.getElementById('saveFacultyBtn');
+    const notice = document.getElementById('editFacultyNotice');
+    btn.disabled = true;
+    try {
+      const res = await SAMS.apiFetch(`/api/admin/faculty/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+      const data = await res.json();
+      if (res.ok) {
+        showNotice(notice, '✓ ' + data.message, 'success');
+        setTimeout(() => { closeEditFacultyModal(); loadFaculty(); }, 1000);
+      } else { showNotice(notice, data.error || 'Update failed', 'error'); }
+    } catch { showNotice(notice, 'Network error', 'error'); }
+    finally { btn.disabled = false; }
+  }
+  window.openEditFacultyModal = openEditFacultyModal;
+  window.closeEditFacultyModal = closeEditFacultyModal;
+  window.saveFacultyEdit = saveFacultyEdit;
 
   /* ── Pager helper ── */
   function renderPager(containerId, page, pages, onPage) {

@@ -54,7 +54,16 @@ const pool = mysql.createPool({
 app.use(express.json({ limit: '16kb' }));
 app.get('/faculty.html', (req, res) => res.redirect('/faculty/faculty_dashboard.html'));
 app.get('/student.html', (req, res) => res.redirect('/student/student_dashboard.html'));
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files with no-cache headers during development
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, path) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // ── Small helpers ──────────────────────────────────────────
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -354,6 +363,46 @@ app.put('/api/admin/users/:id/status', authenticate, requireRole('admin'), async
     if (!result.affectedRows) return fail(res, 404, 'User not found.');
     auditLog(req.user.sub, 'admin', status === 'approved' ? 'ACTIVATE_USER' : 'SUSPEND_USER', 'user', userId);
     return res.json({ message: `User account ${status} successfully.` });
+  } catch (error) { return next(error); }
+});
+
+/* ── Edit Student ── */
+app.put('/api/admin/students/:id', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const studentId = parseInt(req.params.id);
+    const { name, roll_number, batch_year } = req.body;
+    if (!name || !roll_number || !batch_year) return fail(res, 400, 'Missing required fields.');
+    
+    const [existing] = await pool.execute('SELECT student_id FROM students WHERE roll_number = ? AND student_id != ?', [roll_number, studentId]);
+    if (existing.length > 0) return fail(res, 409, 'Roll number already in use by another student.');
+
+    const [result] = await pool.execute(
+      'UPDATE students SET name = ?, roll_number = ?, batch_year = ? WHERE student_id = ?',
+      [name, roll_number, batch_year, studentId]
+    );
+    if (!result.affectedRows) return fail(res, 404, 'Student not found.');
+    auditLog(req.user.sub, 'admin', 'UPDATE_STUDENT', 'student', studentId);
+    return res.json({ message: 'Student updated successfully.' });
+  } catch (error) { return next(error); }
+});
+
+/* ── Edit Faculty ── */
+app.put('/api/admin/faculty/:id', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const facultyId = parseInt(req.params.id);
+    const { name, employee_id, designation } = req.body;
+    if (!name || !employee_id || !designation) return fail(res, 400, 'Missing required fields.');
+
+    const [existing] = await pool.execute('SELECT faculty_id FROM faculty WHERE employee_id = ? AND faculty_id != ?', [employee_id, facultyId]);
+    if (existing.length > 0) return fail(res, 409, 'Employee ID already in use by another faculty.');
+
+    const [result] = await pool.execute(
+      'UPDATE faculty SET name = ?, employee_id = ?, designation = ? WHERE faculty_id = ?',
+      [name, employee_id, designation, facultyId]
+    );
+    if (!result.affectedRows) return fail(res, 404, 'Faculty not found.');
+    auditLog(req.user.sub, 'admin', 'UPDATE_FACULTY', 'faculty', facultyId);
+    return res.json({ message: 'Faculty updated successfully.' });
   } catch (error) { return next(error); }
 });
 
@@ -670,6 +719,20 @@ app.post('/api/qr/scan', authenticate, requireRole('student'), async (req, res, 
 // ==========================================
 // STUDENT APIs
 // ==========================================
+/* ── Centralized calculation API ── */
+app.get('/api/calculate-attendance', authenticate, (req, res, next) => {
+  try {
+    let attended = parseInt(req.query.attended);
+    let total = parseInt(req.query.total);
+    if (isNaN(attended) || isNaN(total) || attended < 0 || total < 0 || attended > total) {
+      return fail(res, 400, 'Invalid attendance parameters.');
+    }
+    const result = calcThreshold(attended, total);
+    return res.json({ attended, total, ...result });
+  } catch (error) { return next(error); }
+});
+
+
 app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, res, next) => {
   try {
     const [rows] = await pool.execute(
@@ -841,6 +904,14 @@ app.get('/api/faculty/students', authenticate, requireRole('faculty'), async (re
   try {
     const courseId = parseInt(req.query.course_id);
     if (!courseId) return fail(res, 400, 'Course ID required.');
+
+    const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+
+    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
     const [students] = await pool.execute(
       `SELECT s.student_id, s.name, s.roll_number
        FROM students s JOIN enrollments e ON s.student_id = e.student_id
@@ -858,13 +929,22 @@ app.post('/api/faculty/mark-attendance', authenticate, requireRole('faculty'), a
     if (!course_id || !records || !Array.isArray(records)) return fail(res, 400, 'Invalid data format.');
     const [faculties] = await connection.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
     if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+    
+    const [assignment] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, course_id]);
+    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
     await connection.beginTransaction();
     const [session] = await connection.execute(
       'INSERT INTO sessions (course_id, faculty_id, session_date, start_time) VALUES (?, ?, ?, CURTIME())',
-      [course_id, faculties[0].faculty_id, date || new Date().toISOString().split('T')[0]]
+      [course_id, facultyId, date || new Date().toISOString().split('T')[0]]
     );
     for (const record of records) {
       if (!record.student_id) continue;
+      
+      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?', [record.student_id, course_id]);
+      if (!enroll.length) continue;
+
       const status = record.status === 'Absent' ? 'Absent' : 'Present';
       await connection.execute(
         'INSERT INTO attendance_records (session_id, student_id, status) VALUES (?, ?, ?)',
@@ -878,6 +958,95 @@ app.post('/api/faculty/mark-attendance', authenticate, requireRole('faculty'), a
     return next(error);
   } finally { connection.release(); }
 });
+
+/* ── View Past Sessions ── */
+app.get('/api/faculty/sessions', authenticate, requireRole('faculty'), async (req, res, next) => {
+  try {
+    const courseId = parseInt(req.query.course_id);
+    if (!courseId) return fail(res, 400, 'Course ID required.');
+    
+    const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+
+    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
+    const [sessions] = await pool.execute(
+      `SELECT session_id, session_date, start_time 
+       FROM sessions WHERE course_id = ? AND faculty_id = ? ORDER BY session_date DESC, start_time DESC`,
+      [courseId, facultyId]
+    );
+    return res.json(sessions);
+  } catch (error) { return next(error); }
+});
+
+/* ── View Session Attendance ── */
+app.get('/api/faculty/sessions/:session_id/attendance', authenticate, requireRole('faculty'), async (req, res, next) => {
+  try {
+    const sessionId = parseInt(req.params.session_id);
+    const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+
+    const [sessions] = await pool.execute('SELECT course_id FROM sessions WHERE session_id = ? AND faculty_id = ?', [sessionId, facultyId]);
+    if (!sessions.length) return fail(res, 403, 'Unauthorized or session not found.');
+    
+    const courseId = sessions[0].course_id;
+    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
+    const [records] = await pool.execute(
+      `SELECT s.student_id, s.name, s.roll_number, ar.status 
+       FROM attendance_records ar
+       JOIN students s ON s.student_id = ar.student_id
+       WHERE ar.session_id = ? ORDER BY s.name`,
+      [sessionId]
+    );
+    return res.json(records);
+  } catch (error) { return next(error); }
+});
+
+/* ── Modify Session Attendance ── */
+app.put('/api/faculty/sessions/:session_id/attendance', authenticate, requireRole('faculty'), async (req, res, next) => {
+  const connection = await pool.getConnection();
+  try {
+    const sessionId = parseInt(req.params.session_id);
+    const { records } = req.body;
+    if (!records || !Array.isArray(records)) return fail(res, 400, 'Invalid data format.');
+
+    const [faculties] = await connection.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+
+    const [sessions] = await connection.execute('SELECT course_id FROM sessions WHERE session_id = ? AND faculty_id = ? FOR UPDATE', [sessionId, facultyId]);
+    if (!sessions.length) return fail(res, 403, 'Unauthorized or session not found.');
+    const courseId = sessions[0].course_id;
+    
+    const [assignment] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
+    await connection.beginTransaction();
+    for (const record of records) {
+      if (!record.student_id) continue;
+      
+      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?', [record.student_id, courseId]);
+      if (!enroll.length) continue;
+
+      const status = record.status === 'Absent' ? 'Absent' : 'Present';
+      await connection.execute(
+        'UPDATE attendance_records SET status = ? WHERE session_id = ? AND student_id = ?',
+        [status, sessionId, record.student_id]
+      );
+    }
+    await connection.commit();
+    return res.json({ message: 'Attendance updated successfully.' });
+  } catch (error) {
+    await connection.rollback();
+    return next(error);
+  } finally { connection.release(); }
+});
+
 
 // ==========================================
 // PDF REPORT — Professional A4 University Report
