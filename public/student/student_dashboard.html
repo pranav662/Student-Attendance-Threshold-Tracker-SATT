@@ -29,6 +29,9 @@
       <button class="nav-item" data-section="courses" onclick="gotoSection('courses',this)">
         <i data-lucide="book-open"></i><span>My Courses</span>
       </button>
+      <button class="nav-item" data-section="history" onclick="gotoSection('history',this)">
+        <i data-lucide="clock"></i><span>Attendance History</span>
+      </button>
       <button class="nav-item" data-section="threshold" onclick="gotoSection('threshold',this)">
         <i data-lucide="bar-chart-2"></i><span>Threshold</span>
       </button>
@@ -75,8 +78,8 @@
         </div>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-ghost btn-sm" id="dlBtn" onclick="downloadReport()" title="Download attendance PDF">
-          <i data-lucide="download"></i> Report
+        <button class="btn btn-ghost btn-sm" id="dlBtn" onclick="downloadReport()" title="Download attendance PDF report">
+          <i data-lucide="file-text" id="dlIcon"></i> <span id="dlLabel">Report</span>
         </button>
         <button class="btn-icon" id="themeToggle" aria-label="Toggle theme" title="Toggle theme"></button>
       </div>
@@ -210,7 +213,7 @@
               Attendance by Subject
             </div>
             <button class="btn btn-ghost btn-sm" onclick="downloadReport()">
-              <i data-lucide="download"></i> PDF Report
+              <i data-lucide="file-text"></i> PDF Report
             </button>
           </div>
           <div class="data-table-wrap" style="border:none;border-radius:0;">
@@ -223,10 +226,12 @@
                   <th>Absent</th>
                   <th>Attendance</th>
                   <th>Status</th>
+                  <th>Can Miss</th>
+                  <th>Need to Attend</th>
                 </tr>
               </thead>
               <tbody id="courseTableBody">
-                <tr><td colspan="6"><div class="empty-state"><div class="ei">📚</div><p>Loading courses…</p></div></td></tr>
+                <tr><td colspan="8"><div class="empty-state"><div class="ei">📚</div><p>Loading courses…</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -363,6 +368,43 @@
         </div>
       </div>
 
+      <!-- ══ SECTION: ATTENDANCE HISTORY ══════════════════════ -->
+      <div id="section-history" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic Record</div>
+          <h1>Attendance History</h1>
+          <p>Detailed session-by-session attendance record.</p>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="section-title">
+              <div class="section-icon"><i data-lucide="clock"></i></div>
+              Session Records
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadHistory()"><i data-lucide="refresh-cw"></i> Refresh</button>
+          </div>
+          <div class="data-table-wrap" style="border:none;border-radius:0;">
+            <table class="data-table" id="historyTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Course</th>
+                  <th>Faculty</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody">
+                <tr><td colspan="4"><div class="empty-state"><div class="ei">⏳</div><p>Loading history…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.8125rem;color:var(--text-3);" id="historyMeta">—</span>
+            <div style="display:flex;gap:0.375rem;" id="historyPager"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- ══ SECTION: ENROLL ═══════════════════════════════════ -->
       <div id="section-enroll" style="display:none;">
         <div class="page-head">
@@ -419,16 +461,18 @@
   SAMS.requireAuth();
 
   /* ── Section map ── */
-  const SECTIONS = ['overview','courses','threshold','scan','enroll'];
+  const SECTIONS = ['overview','courses','history','threshold','scan','enroll'];
   const TITLES   = {
     overview:  'Dashboard',
     courses:   'My Courses',
+    history:   'Attendance History',
     threshold: 'Threshold',
     scan:      'Mark Attendance',
     enroll:    'Enroll'
   };
 
   let attendanceData = null;
+  let historyPage    = 1;
 
   function gotoSection(name, navEl) {
     SECTIONS.forEach(s => {
@@ -446,7 +490,8 @@
 
     if (name === 'courses' && attendanceData)   renderCoursesTable(attendanceData.courses || []);
     if (name === 'threshold' && attendanceData) renderThresholdSection(attendanceData);
-    if (name === 'enroll') loadAvailableCourses();
+    if (name === 'enroll')   loadAvailableCourses();
+    if (name === 'history')  loadHistory();
   }
   window.gotoSection = gotoSection;
 
@@ -652,7 +697,7 @@
   function renderCoursesTable(courses) {
     const tbody = document.getElementById('courseTableBody');
     if (!courses.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="ei">📚</div><h3>No courses yet</h3><p>Enroll in courses to see your attendance breakdown.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ei">📚</div><h3>No courses yet</h3><p>Enroll in courses to see your attendance breakdown.</p></div></td></tr>`;
       return;
     }
     tbody.innerHTML = courses.map(c => {
@@ -666,6 +711,10 @@
         no_classes:     ['No Classes',      'badge-muted']
       };
       const [sl, sc] = statMap[c.status] || ['—', 'badge-muted'];
+      const canMissVal   = (c.status === 'safe' || c.status === 'near_threshold') ? c.canMiss : '—';
+      const needAttVal   = (c.status === 'at_risk' || c.status === 'critical')    ? c.needToAttend : '—';
+      const canMissColor = typeof canMissVal === 'number' && canMissVal <= 2 ? 'var(--warning)' : 'var(--success)';
+      const needAttColor = typeof needAttVal === 'number' ? 'var(--danger)' : 'var(--text-3)';
       return `
         <tr>
           <td data-label="Course">
@@ -682,6 +731,8 @@
             </div>
           </td>
           <td data-label="Status"><span class="badge ${sc}">${sl}</span></td>
+          <td data-label="Can Miss"><span style="font-weight:600;color:${canMissColor};">${canMissVal}</span></td>
+          <td data-label="Need to Attend"><span style="font-weight:600;color:${needAttColor};">${needAttVal}</span></td>
         </tr>`;
     }).join('');
   }
@@ -874,15 +925,82 @@
   window.enrollCourse = enrollCourse;
 
   /* ── Download PDF report ── */
-  function downloadReport() {
+  async function downloadReport() {
     const token = SAMS.getToken();
     if (!token) return;
-    const a = document.createElement('a');
-    a.href = `/api/student/report/pdf?token=${token}`;
-    a.download = 'attendance_report.pdf';
-    a.click();
+    const btn   = document.getElementById('dlBtn');
+    const label = document.getElementById('dlLabel');
+    const icon  = document.getElementById('dlIcon');
+    btn.disabled  = true;
+    if (label) label.textContent = 'Generating…';
+    if (icon)  icon.setAttribute('data-lucide', 'loader');
+    lucide.createIcons();
+    try {
+      const res = await fetch(`/api/student/report/pdf?token=${token}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        SAMS.toast(data.error || 'Unable to generate report.', 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      // Get roll number from attendanceData if available
+      const roll = attendanceData?.roll_number || 'Student';
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `SATT_Attendance_Report_${roll}.pdf`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      SAMS.toast('✓ Report downloaded successfully.', 'success');
+    } catch {
+      SAMS.toast('Unable to generate report. Please try again.', 'error');
+    } finally {
+      btn.disabled  = false;
+      if (label) label.textContent = 'Report';
+      if (icon)  icon.setAttribute('data-lucide', 'file-text');
+      lucide.createIcons();
+    }
   }
   window.downloadReport = downloadReport;
+
+  /* ── Attendance History ── */
+  async function loadHistory() {
+    try {
+      const res  = await SAMS.apiFetch(`/api/student/attendance-history?page=${historyPage}&limit=20`);
+      const data = await res.json();
+      const rows = data.data || [];
+      const tbody = document.getElementById('historyBody');
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="ei">📋</div><h3>No records yet</h3><p>Attendance records will appear here after sessions are marked.</p></div></td></tr>`;
+        document.getElementById('historyMeta').textContent = '0 records';
+        document.getElementById('historyPager').innerHTML = '';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const dt     = r.session_date ? new Date(r.session_date).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : '—';
+        const isPresent = r.status === 'Present';
+        const badge  = isPresent ? '<span class="badge badge-safe">Present</span>' : '<span class="badge badge-danger">Absent</span>';
+        return `<tr>
+          <td data-label="Date"><span style="font-weight:500;">${dt}</span></td>
+          <td data-label="Course"><span class="course-code">${r.course_code}</span> <span style="font-size:0.8125rem;color:var(--text-2);">${r.course_name}</span></td>
+          <td data-label="Faculty"><span style="font-size:0.8125rem;color:var(--text-3);">${r.faculty_name||'—'}</span></td>
+          <td data-label="Status">${badge}</td>
+        </tr>`;
+      }).join('');
+      const total = data.total || 0;
+      document.getElementById('historyMeta').textContent = `Showing ${rows.length} of ${total} records`;
+      // Simple pager
+      const pages  = data.pages || 1;
+      const pager  = document.getElementById('historyPager');
+      pager.innerHTML = '';
+      if (pages > 1) {
+        if (historyPage > 1)    pager.innerHTML += `<button class="btn btn-ghost btn-sm" onclick="historyPage--;loadHistory();">← Prev</button>`;
+        pager.innerHTML += `<span style="font-size:0.8125rem;color:var(--text-3);padding:0 0.5rem;">${historyPage}/${pages}</span>`;
+        if (historyPage < pages) pager.innerHTML += `<button class="btn btn-ghost btn-sm" onclick="historyPage++;loadHistory();">Next →</button>`;
+      }
+    } catch { SAMS.toast('Could not load attendance history.', 'error'); }
+  }
+  window.loadHistory = loadHistory;
 
   /* ── Init ── */
   loadUser();

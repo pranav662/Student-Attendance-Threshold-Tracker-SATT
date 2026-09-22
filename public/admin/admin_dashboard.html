@@ -4,14 +4,91 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard — SATT</title>
-  <meta name="description" content="Admin dashboard — manage faculty approvals and view system statistics.">
+  <meta name="description" content="SATT Administration Portal — manage students, faculty, courses, departments, and system settings.">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <style>
+    /* ── Admin-specific extensions ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 9990; display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: auto; }
+    .modal-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-xl); padding: 1.5rem; width: 90%; max-width: 480px;
+      max-height: 90vh; overflow-y: auto; position: relative;
+      box-shadow: var(--shadow-lg);
+    }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .modal-title { font-size: 1rem; font-weight: 700; color: var(--text-1); }
+    .modal-close { background: none; border: none; cursor: pointer; color: var(--text-3); padding: 4px; border-radius: var(--r-sm); }
+    .modal-close:hover { color: var(--text-2); background: var(--bg-hover); }
+
+    .admin-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    .admin-table thead th {
+      background: var(--bg-hover); color: var(--text-2);
+      font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; padding: 0.625rem 0.875rem;
+      border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap;
+    }
+    .admin-table tbody tr { border-bottom: 1px solid var(--border-light); transition: background 0.1s; }
+    .admin-table tbody tr:last-child { border-bottom: none; }
+    .admin-table tbody tr:hover { background: var(--bg-hover); }
+    .admin-table td { padding: 0.6875rem 0.875rem; color: var(--text-1); vertical-align: middle; }
+
+    .search-bar {
+      display: flex; align-items: center; gap: 0.625rem;
+      padding: 0.5rem 0.875rem; border: 1px solid var(--border);
+      border-radius: var(--r-md); background: var(--bg-input);
+      flex: 1; max-width: 340px;
+    }
+    .search-bar input {
+      border: none; background: transparent; outline: none; font-size: 0.875rem;
+      color: var(--text-1); font-family: var(--font-ui); width: 100%;
+    }
+    .search-bar input::placeholder { color: var(--text-3); }
+    .search-bar svg { width: 14px; height: 14px; color: var(--text-3); flex-shrink: 0; }
+
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .toolbar-left { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
+
+    .page-numbers { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+    .page-num-btn {
+      width: 30px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--border);
+      background: var(--bg-hover); font-size: 0.8125rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; color: var(--text-2);
+      font-family: var(--font-ui); transition: background 0.15s;
+    }
+    .page-num-btn:hover { background: var(--border); }
+    .page-num-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .confirm-msg { font-size: 0.875rem; color: var(--text-2); margin: 0.75rem 0 1.25rem; line-height: 1.6; }
+    .confirm-actions { display: flex; gap: 0.625rem; justify-content: flex-end; }
+
+    .stat-grid-8 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.875rem; margin-bottom: 1.5rem; }
+    @media (max-width: 1200px) { .stat-grid-8 { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 900px)  { .stat-grid-8 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px)  { .stat-grid-8 { grid-template-columns: 1fr; } }
+
+    .at-risk-bar { height: 6px; background: var(--border); border-radius: var(--r-full); overflow: hidden; margin-top: 3px; }
+    .at-risk-bar-fill { height: 100%; border-radius: var(--r-full); background: var(--danger); }
+
+    .section-divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+
+    @media (max-width: 768px) {
+      .admin-table thead { display: none; }
+      .admin-table tbody tr { display: block; border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 0.625rem; padding: 0.75rem; }
+      .admin-table td { display: flex; align-items: center; justify-content: space-between; border: none; padding: 0.25rem 0; font-size: 0.8125rem; }
+      .admin-table td::before { content: attr(data-label); font-size: 0.6875rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; min-width: 90px; }
+    }
+  </style>
 </head>
 <body>
 <div class="app-shell">
 
-  <!-- ══ SIDEBAR ════════════════════════════════════════════== -->
+  <!-- ══ SIDEBAR ════════════════════════════════════════════ -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-head">
       <div class="sidebar-logo">S</div>
@@ -26,9 +103,39 @@
       <button class="nav-item active" data-section="overview" onclick="gotoSection('overview',this)">
         <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
       </button>
+
+      <div class="nav-group-label">Academic</div>
+      <button class="nav-item" data-section="students" onclick="gotoSection('students',this)">
+        <i data-lucide="users"></i><span>Students</span>
+      </button>
+      <button class="nav-item" data-section="faculty" onclick="gotoSection('faculty',this)">
+        <i data-lucide="briefcase"></i><span>Faculty</span>
+      </button>
+      <button class="nav-item" data-section="courses" onclick="gotoSection('courses',this)">
+        <i data-lucide="book-open"></i><span>Courses</span>
+      </button>
+      <button class="nav-item" data-section="departments" onclick="gotoSection('departments',this)">
+        <i data-lucide="building-2"></i><span>Departments</span>
+      </button>
+
+      <div class="nav-group-label">Attendance</div>
+      <button class="nav-item" data-section="monitoring" onclick="gotoSection('monitoring',this)">
+        <i data-lucide="clipboard-list"></i><span>Monitoring</span>
+      </button>
+      <button class="nav-item" data-section="atrisk" onclick="gotoSection('atrisk',this)">
+        <i data-lucide="alert-triangle"></i><span>At-Risk Students</span>
+      </button>
+
+      <div class="nav-group-label">System</div>
       <button class="nav-item" data-section="approvals" onclick="gotoSection('approvals',this)">
         <i data-lucide="user-check"></i><span>Faculty Approvals</span>
         <span class="nav-badge" id="pendingBadge" style="display:none;">0</span>
+      </button>
+      <button class="nav-item" data-section="auditlogs" onclick="gotoSection('auditlogs',this)">
+        <i data-lucide="scroll-text"></i><span>Audit Logs</span>
+      </button>
+      <button class="nav-item" data-section="settings" onclick="gotoSection('settings',this)">
+        <i data-lucide="settings"></i><span>Settings</span>
       </button>
 
       <div class="nav-group-label">Account</div>
@@ -52,11 +159,11 @@
   </nav>
   <div class="sidebar-backdrop" id="backdrop" onclick="closeSidebar()"></div>
 
-  <!-- ══ MAIN ══════════════════════════════════════════════════ -->
+  <!-- ══ MAIN ══════════════════════════════════════════════ -->
   <div class="main">
     <header class="topbar">
       <div class="topbar-left">
-        <button class="mobile-menu-btn" id="menuBtn" onclick="openSidebar()" aria-label="Menu">
+        <button class="mobile-menu-btn" id="menuBtn" onclick="openSidebar()" aria-label="Open menu">
           <i data-lucide="menu"></i>
         </button>
         <div class="topbar-info">
@@ -70,7 +177,7 @@
 
     <div class="page">
 
-      <!-- ══ OVERVIEW ══════════════════════════════════════════ -->
+      <!-- ══ OVERVIEW ═══════════════════════════════════════ -->
       <div id="section-overview">
         <div class="page-head">
           <div class="eyebrow">Administration</div>
@@ -78,63 +185,335 @@
           <p>University attendance management at a glance.</p>
         </div>
 
-        <!-- Stats -->
-        <div class="stat-grid" style="margin-bottom:1.5rem;">
+        <!-- 8 stats in 4-column grid -->
+        <div class="stat-grid-8" id="statsGrid">
           <div class="stat-tile" style="--tile-bar:var(--primary);">
-            <div class="stat-icon" style="--tile-icon-bg:var(--primary-light);">
-              <i data-lucide="users" style="width:18px;height:18px;color:var(--primary);"></i>
-            </div>
+            <div class="stat-icon" style="--tile-icon-bg:var(--primary-light);"><i data-lucide="users" style="width:18px;height:18px;color:var(--primary);"></i></div>
             <div class="stat-val skel" id="statStudents">—</div>
             <div class="stat-lbl">Total Students</div>
           </div>
           <div class="stat-tile" style="--tile-bar:var(--info);">
-            <div class="stat-icon" style="--tile-icon-bg:var(--info-bg);">
-              <i data-lucide="briefcase" style="width:18px;height:18px;color:var(--info);"></i>
-            </div>
+            <div class="stat-icon" style="--tile-icon-bg:var(--info-bg);"><i data-lucide="briefcase" style="width:18px;height:18px;color:var(--info);"></i></div>
             <div class="stat-val skel" id="statFaculty">—</div>
             <div class="stat-lbl">Faculty Members</div>
           </div>
           <div class="stat-tile" style="--tile-bar:var(--success);">
-            <div class="stat-icon" style="--tile-icon-bg:var(--success-bg);">
-              <i data-lucide="book" style="width:18px;height:18px;color:var(--success);"></i>
-            </div>
+            <div class="stat-icon" style="--tile-icon-bg:var(--success-bg);"><i data-lucide="book" style="width:18px;height:18px;color:var(--success);"></i></div>
             <div class="stat-val skel" id="statCourses">—</div>
-            <div class="stat-lbl">Active Courses</div>
+            <div class="stat-lbl">Total Courses</div>
           </div>
           <div class="stat-tile" style="--tile-bar:var(--warning);">
-            <div class="stat-icon" style="--tile-icon-bg:var(--warning-bg);">
-              <i data-lucide="clock" style="width:18px;height:18px;color:var(--warning);"></i>
-            </div>
+            <div class="stat-icon" style="--tile-icon-bg:var(--warning-bg);"><i data-lucide="clock" style="width:18px;height:18px;color:var(--warning);"></i></div>
             <div class="stat-val skel" id="statPending">—</div>
             <div class="stat-lbl">Pending Approvals</div>
           </div>
+          <div class="stat-tile" style="--tile-bar:#8B5CF6;">
+            <div class="stat-icon" style="--tile-icon-bg:#F5F3FF;"><i data-lucide="building-2" style="width:18px;height:18px;color:#8B5CF6;"></i></div>
+            <div class="stat-val skel" id="statDepts">—</div>
+            <div class="stat-lbl">Departments</div>
+          </div>
+          <div class="stat-tile" style="--tile-bar:var(--danger);">
+            <div class="stat-icon" style="--tile-icon-bg:var(--danger-bg);"><i data-lucide="alert-triangle" style="width:18px;height:18px;color:var(--danger);"></i></div>
+            <div class="stat-val skel" id="statAtRisk">—</div>
+            <div class="stat-lbl">At-Risk Students</div>
+          </div>
+          <div class="stat-tile" style="--tile-bar:#0EA5E9;">
+            <div class="stat-icon" style="--tile-icon-bg:#F0F9FF;"><i data-lucide="calendar-check" style="width:18px;height:18px;color:#0EA5E9;"></i></div>
+            <div class="stat-val skel" id="statSessions">—</div>
+            <div class="stat-lbl">Total Sessions</div>
+          </div>
+          <div class="stat-tile" style="--tile-bar:#10B981;">
+            <div class="stat-icon" style="--tile-icon-bg:#ECFDF5;"><i data-lucide="calendar-clock" style="width:18px;height:18px;color:#10B981;"></i></div>
+            <div class="stat-val skel" id="statToday">—</div>
+            <div class="stat-lbl">Today's Sessions</div>
+          </div>
         </div>
 
-        <!-- Quick action -->
-        <div class="card" id="pendingQuickCard">
-          <div class="section-head">
-            <div>
-              <div class="card-title">Pending Faculty Approvals</div>
-              <div class="card-sub" id="pendingQuickSub">Loading…</div>
+        <!-- Quick cards -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" id="quickCards">
+          <div class="card" id="pendingQuickCard">
+            <div class="section-head">
+              <div>
+                <div class="card-title">Pending Faculty Approvals</div>
+                <div class="card-sub" id="pendingQuickSub">Loading…</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="gotoSection('approvals',null)">
+                <i data-lucide="arrow-right"></i> Review
+              </button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="gotoSection('approvals',null)">
-              <i data-lucide="arrow-right"></i> Review Now
-            </button>
+            <div id="pendingQuickList" style="margin-top:0.875rem;">
+              <div class="empty-state" style="padding:0.75rem;"><div class="ei">⏳</div><p>Loading…</p></div>
+            </div>
           </div>
-          <div id="pendingQuickList" style="margin-top:1rem;">
-            <div class="empty-state" style="padding:1rem;"><div class="ei">⏳</div><p>Loading…</p></div>
+          <div class="card">
+            <div class="section-head">
+              <div>
+                <div class="card-title">At-Risk Students</div>
+                <div class="card-sub">Students below 75% attendance</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="gotoSection('atrisk',null)">
+                <i data-lucide="arrow-right"></i> View All
+              </button>
+            </div>
+            <div id="atRiskQuickList" style="margin-top:0.875rem;">
+              <div class="empty-state" style="padding:0.75rem;"><div class="ei">⏳</div><p>Loading…</p></div>
+            </div>
+          </div>
+        </div>
+        <style>@media(max-width:720px){#quickCards{grid-template-columns:1fr;}}</style>
+      </div>
+
+      <!-- ══ STUDENTS ════════════════════════════════════════ -->
+      <div id="section-students" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic</div>
+          <h1>Students</h1>
+          <p>All registered students and their attendance overview.</p>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="toolbar-left">
+              <div class="search-bar">
+                <i data-lucide="search"></i>
+                <input type="text" id="studentSearch" placeholder="Search name, roll, or email…" oninput="debouncedStudentSearch()">
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadStudents()"><i data-lucide="refresh-cw"></i> Refresh</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="admin-table" id="studentsTable">
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Roll Number</th>
+                  <th>Email</th>
+                  <th>Batch</th>
+                  <th>Courses</th>
+                  <th>Attendance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="studentsBody">
+                <tr><td colspan="7"><div class="empty-state"><div class="ei">⏳</div><p>Loading students…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.8125rem;color:var(--text-3);" id="studentsMeta">—</span>
+            <div class="page-numbers" id="studentsPager"></div>
           </div>
         </div>
       </div>
 
-      <!-- ══ APPROVALS ═════════════════════════════════════════ -->
+      <!-- ══ FACULTY ══════════════════════════════════════════ -->
+      <div id="section-faculty" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic</div>
+          <h1>Faculty</h1>
+          <p>All faculty members and their assignments.</p>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="toolbar-left">
+              <div class="search-bar">
+                <i data-lucide="search"></i>
+                <input type="text" id="facultySearch" placeholder="Search name, ID, or email…" oninput="debouncedFacultySearch()">
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadFaculty()"><i data-lucide="refresh-cw"></i> Refresh</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="admin-table" id="facultyTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Employee ID</th>
+                  <th>Email</th>
+                  <th>Designation</th>
+                  <th>Courses</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="facultyBody">
+                <tr><td colspan="7"><div class="empty-state"><div class="ei">⏳</div><p>Loading faculty…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ COURSES ══════════════════════════════════════════ -->
+      <div id="section-courses" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic</div>
+          <h1>Courses</h1>
+          <p>Manage all courses offered by the university.</p>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="toolbar-left">
+              <div class="search-bar">
+                <i data-lucide="search"></i>
+                <input type="text" id="coursesSearch" placeholder="Search code or name…" oninput="debouncedCoursesSearch()">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openCourseModal()">
+              <i data-lucide="plus"></i> New Course
+            </button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="admin-table" id="coursesTable">
+              <thead>
+                <tr>
+                  <th>Course Code</th>
+                  <th>Course Name</th>
+                  <th>Department</th>
+                  <th>Students</th>
+                  <th>Faculty</th>
+                  <th>Sessions</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="coursesBody">
+                <tr><td colspan="7"><div class="empty-state"><div class="ei">⏳</div><p>Loading courses…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ DEPARTMENTS ══════════════════════════════════════ -->
+      <div id="section-departments" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic</div>
+          <h1>Departments</h1>
+          <p>University departments and their course/student counts.</p>
+        </div>
+        <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+          <div class="card" style="padding:0;flex:1;min-width:320px;">
+            <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+              <div class="card-title">Departments</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadDepartments()"><i data-lucide="refresh-cw"></i></button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>Code</th><th>Name</th><th>Courses</th><th>Students</th></tr>
+                </thead>
+                <tbody id="deptsBody">
+                  <tr><td colspan="4"><div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card" style="width:300px;flex-shrink:0;">
+            <div class="card-title" style="margin-bottom:1rem;">Add Department</div>
+            <div class="form-group">
+              <label class="form-label" for="deptCode">Department Code</label>
+              <input class="form-input" id="deptCode" type="text" placeholder="e.g. CSE" maxlength="20">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="deptName">Department Name</label>
+              <input class="form-input" id="deptName" type="text" placeholder="e.g. Computer Science">
+            </div>
+            <button class="btn btn-primary" onclick="addDepartment()" style="width:100%;">
+              <i data-lucide="plus"></i> Add Department
+            </button>
+            <div id="deptNotice" class="notice"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ ATTENDANCE MONITORING ══════════════════════════ -->
+      <div id="section-monitoring" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Attendance</div>
+          <h1>Attendance Monitoring</h1>
+          <p>Course-wise attendance breakdown for all students.</p>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="toolbar-left">
+              <div class="search-bar">
+                <i data-lucide="search"></i>
+                <input type="text" id="monitorSearch" placeholder="Search student name or roll…" oninput="debouncedMonitorSearch()">
+              </div>
+              <select class="form-select" id="monitorCourseFilter" onchange="loadMonitoring()" style="width:auto;padding:0.4375rem 0.75rem;font-size:0.875rem;">
+                <option value="">All Courses</option>
+              </select>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadMonitoring()"><i data-lucide="refresh-cw"></i> Refresh</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Roll Number</th>
+                  <th>Course</th>
+                  <th>Total</th>
+                  <th>Present</th>
+                  <th>Absent</th>
+                  <th>Attendance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="monitoringBody">
+                <tr><td colspan="8"><div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.8125rem;color:var(--text-3);" id="monitorMeta">—</span>
+            <div class="page-numbers" id="monitorPager"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ AT-RISK STUDENTS ════════════════════════════════ -->
+      <div id="section-atrisk" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Attendance</div>
+          <h1>At-Risk Students</h1>
+          <p>Students whose overall attendance is below the 75% required threshold.</p>
+        </div>
+        <div class="card" id="atRiskSummaryCard" style="margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <div style="font-size:1.75rem;font-weight:700;color:var(--danger);" id="atRiskCount">—</div>
+          <div>
+            <div style="font-weight:600;color:var(--text-1);">Students At Risk</div>
+            <div style="font-size:0.8125rem;color:var(--text-3);">Below 75% overall attendance threshold</div>
+          </div>
+        </div>
+        <div class="card" style="padding:0;">
+          <div style="overflow-x:auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Roll Number</th>
+                  <th>Email</th>
+                  <th>Batch</th>
+                  <th>Attendance</th>
+                  <th>Need to Attend</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="atRiskBody">
+                <tr><td colspan="7"><div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ FACULTY APPROVALS ════════════════════════════════ -->
       <div id="section-approvals" style="display:none;">
         <div class="page-head">
-          <div class="eyebrow">Administration</div>
+          <div class="eyebrow">System</div>
           <h1>Faculty Approvals</h1>
           <p>Review and approve faculty account registration requests.</p>
         </div>
-
         <div class="card" style="max-width:720px;padding:0;">
           <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
             <div class="section-title">
@@ -151,9 +530,121 @@
         </div>
       </div>
 
+      <!-- ══ AUDIT LOGS ═══════════════════════════════════════ -->
+      <div id="section-auditlogs" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">System</div>
+          <h1>Audit Logs</h1>
+          <p>Record of all significant system actions.</p>
+        </div>
+        <div class="card" style="padding:0;">
+          <div class="section-head" style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+            <div class="search-bar">
+              <i data-lucide="search"></i>
+              <input type="text" id="auditSearch" placeholder="Search action or role…" oninput="debouncedAuditSearch()">
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadAuditLogs()"><i data-lucide="refresh-cw"></i></button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="admin-table">
+              <thead>
+                <tr><th>Time</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>Details</th></tr>
+              </thead>
+              <tbody id="auditBody">
+                <tr><td colspan="6"><div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:0.875rem 1.25rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <span style="font-size:0.8125rem;color:var(--text-3);" id="auditMeta">—</span>
+            <div class="page-numbers" id="auditPager"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SETTINGS ══════════════════════════════════════════ -->
+      <div id="section-settings" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">System</div>
+          <h1>Settings</h1>
+          <p>System-wide configuration for the attendance portal.</p>
+        </div>
+        <div class="card" style="max-width:560px;">
+          <div class="card-title" style="margin-bottom:1.25rem;">Attendance &amp; Academic Configuration</div>
+          <div class="form-group">
+            <label class="form-label" for="settingThreshold">Attendance Threshold (%)</label>
+            <input class="form-input" id="settingThreshold" type="number" min="50" max="100" step="1" placeholder="75">
+            <div class="form-hint">Minimum attendance percentage required (default: 75%)</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settingYear">Academic Year</label>
+            <input class="form-input" id="settingYear" type="text" placeholder="e.g. 2026">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settingSemester">Current Semester</label>
+            <input class="form-input" id="settingSemester" type="text" placeholder="e.g. Fall 2026">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settingQrMax">QR Maximum Duration (minutes)</label>
+            <input class="form-input" id="settingQrMax" type="number" min="1" max="120" step="1" placeholder="60">
+            <div class="form-hint">Maximum allowed QR session duration in minutes</div>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">
+            <i data-lucide="save"></i> Save Settings
+          </button>
+          <div id="settingsNotice" class="notice" style="margin-top:0.75rem;"></div>
+        </div>
+      </div>
+
     </div><!-- /.page -->
   </div><!-- /.main -->
 </div><!-- /.app-shell -->
+
+<!-- ── Course Modal ── -->
+<div class="modal-overlay" id="courseModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title" id="courseModalTitle">New Course</div>
+      <button class="modal-close" onclick="closeCourseModal()" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="courseCode">Course Code</label>
+      <input class="form-input" id="courseCode" type="text" placeholder="e.g. CS101" maxlength="50">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="courseName">Course Name</label>
+      <input class="form-input" id="courseName" type="text" placeholder="e.g. Introduction to Programming">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="courseDept">Department</label>
+      <select class="form-select" id="courseDept">
+        <option value="">— Select department —</option>
+      </select>
+    </div>
+    <div id="courseModalNotice" class="notice"></div>
+    <div style="display:flex;gap:0.625rem;margin-top:1rem;">
+      <button class="btn btn-ghost" onclick="closeCourseModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCourse()" id="saveCourseBtn" style="flex:1;">
+        <i data-lucide="save"></i> Save Course
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Modal ── -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-head">
+      <div class="modal-title" id="confirmTitle">Confirm Action</div>
+      <button class="modal-close" onclick="closeConfirm()" aria-label="Close"><i data-lucide="x"></i></button>
+    </div>
+    <p class="confirm-msg" id="confirmMsg">Are you sure?</p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirmOkBtn" onclick="executeConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 <script>
@@ -162,9 +653,18 @@
   SAMS.initTheme();
   SAMS.requireAuth();
 
-  const SECTIONS = ['overview','approvals'];
-  const TITLES   = { overview:'Dashboard', approvals:'Faculty Approvals' };
+  // ── Role guard ──
+  const decoded = SAMS.getToken() ? (() => { try { return JSON.parse(atob(SAMS.getToken().split('.')[1])); } catch { return {}; } })() : {};
+  if (decoded.role !== 'admin') { SAMS.logout(); }
 
+  const SECTIONS = ['overview','students','faculty','courses','departments','monitoring','atrisk','approvals','auditlogs','settings'];
+  const TITLES   = {
+    overview:'Dashboard', students:'Students', faculty:'Faculty', courses:'Courses',
+    departments:'Departments', monitoring:'Attendance Monitoring', atrisk:'At-Risk Students',
+    approvals:'Faculty Approvals', auditlogs:'Audit Logs', settings:'Settings'
+  };
+
+  /* ── Section navigation ── */
   function gotoSection(name, navEl) {
     SECTIONS.forEach(s => {
       const el = document.getElementById('section-' + s);
@@ -175,7 +675,19 @@
     else { const btn = document.querySelector(`.nav-item[data-section="${name}"]`); if (btn) btn.classList.add('active'); }
     document.getElementById('topbarTitle').textContent = TITLES[name] || name;
     closeSidebar();
-    if (name === 'approvals') loadPendingTeachers();
+    // Lazy load
+    const loaders = {
+      students:    loadStudents,
+      faculty:     loadFaculty,
+      courses:     () => { loadCourses(); loadDepartments(); },
+      departments: loadDepartments,
+      monitoring:  () => { loadMonitoringCourses(); loadMonitoring(); },
+      atrisk:      loadAtRisk,
+      approvals:   loadPendingTeachers,
+      auditlogs:   loadAuditLogs,
+      settings:    loadSettings,
+    };
+    if (loaders[name]) loaders[name]();
   }
   window.gotoSection = gotoSection;
 
@@ -197,58 +709,57 @@
     } catch {}
   }
 
-  /* ── Load admin stats ── */
+  /* ── Stats ── */
   async function loadStats() {
     try {
       const res  = await SAMS.apiFetch('/api/admin/stats');
       if (!res.ok) return;
-      const data = await res.json();
-
+      const d = await res.json();
       function setStat(id, val) {
         const el = document.getElementById(id);
         if (el) { el.textContent = val ?? '—'; el.classList.remove('skel'); }
       }
-      setStat('statStudents', data.students ?? data.total_students ?? 0);
-      setStat('statFaculty',  data.faculty  ?? data.total_faculty  ?? 0);
-      setStat('statCourses',  data.courses  ?? data.total_courses  ?? 0);
-      setStat('statPending',  data.pending  ?? data.pending_faculty ?? 0);
+      setStat('statStudents', d.students);
+      setStat('statFaculty',  d.faculty);
+      setStat('statCourses',  d.courses);
+      setStat('statPending',  d.pending);
+      setStat('statDepts',    d.departments);
+      setStat('statAtRisk',   d.at_risk);
+      setStat('statSessions', d.sessions);
+      setStat('statToday',    d.today_sessions);
 
-      const pending = data.pending ?? data.pending_faculty ?? 0;
       const badge = document.getElementById('pendingBadge');
-      if (pending > 0) { badge.textContent = pending; badge.style.display = ''; }
+      if (d.pending > 0) { badge.textContent = d.pending; badge.style.display = ''; }
       document.getElementById('pendingQuickSub').textContent =
-        pending > 0 ? `${pending} teacher${pending===1?'':'s'} awaiting approval` : 'All caught up — no pending approvals';
+        d.pending > 0 ? `${d.pending} teacher${d.pending===1?'':'s'} awaiting approval` : 'All caught up — no pending approvals';
     } catch {}
   }
 
-  /* ── Load pending teachers (for both overview preview and approvals section) ── */
+  /* ── Pending teachers (overview + approvals) ── */
   async function loadPendingTeachers() {
     try {
-      const res   = await SAMS.apiFetch('/api/admin/pending-teachers');
-      const data  = await res.json();
-      const list  = Array.isArray(data) ? data : [];
+      const res  = await SAMS.apiFetch('/api/admin/pending-teachers');
+      const list = await res.json();
+      const arr  = Array.isArray(list) ? list : [];
 
-      // Quick preview on overview
-      const quickList = document.getElementById('pendingQuickList');
-      if (!list.length) {
-        quickList.innerHTML = `<div class="empty-state" style="padding:1rem;"><div class="ei">✓</div><p>No pending approvals. You're all caught up.</p></div>`;
+      // Quick card
+      const ql = document.getElementById('pendingQuickList');
+      if (!arr.length) {
+        ql.innerHTML = `<div class="empty-state" style="padding:0.75rem;"><div class="ei">✓</div><p>No pending approvals.</p></div>`;
       } else {
-        const preview = list.slice(0, 3);
-        quickList.innerHTML = preview.map(t => renderApprovalCard(t, true)).join('') +
-          (list.length > 3 ? `<div style="padding:0.5rem 0;text-align:center;"><button class="btn btn-ghost btn-sm" onclick="gotoSection('approvals',null)">View all ${list.length} pending</button></div>` : '');
+        ql.innerHTML = arr.slice(0,3).map(t => renderApprovalCard(t, true)).join('');
       }
 
-      // Full list on approvals section
-      const fullList = document.getElementById('approvalsList');
-      if (!list.length) {
-        fullList.innerHTML = `<div class="empty-state"><div class="ei">✓</div><h3>No pending approvals</h3><p>All faculty accounts have been reviewed.</p></div>`;
+      // Full list
+      const fl = document.getElementById('approvalsList');
+      if (!fl) return;
+      if (!arr.length) {
+        fl.innerHTML = `<div class="empty-state"><div class="ei">✓</div><h3>No pending approvals</h3><p>All faculty accounts have been reviewed.</p></div>`;
       } else {
-        fullList.innerHTML = list.map(t => renderApprovalCard(t, false)).join('');
+        fl.innerHTML = arr.map(t => renderApprovalCard(t, false)).join('');
       }
       lucide.createIcons();
-    } catch {
-      SAMS.toast('Could not load pending teachers.', 'error');
-    }
+    } catch { SAMS.toast('Could not load pending teachers.', 'error'); }
   }
   window.loadPendingTeachers = loadPendingTeachers;
 
@@ -258,15 +769,15 @@
       <div class="approval-card" id="approvalCard_${t.user_id}">
         <div class="app-avatar">${initial}</div>
         <div style="flex:1;min-width:0;">
-          <div class="app-name">${t.name || 'Unnamed Faculty'}</div>
-          <div class="app-email">${t.email}</div>
-          ${compact ? '' : `<div style="font-size:0.6875rem;color:var(--text-3);margin-top:2px;">Applied: ${t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : '—'}</div>`}
+          <div class="app-name">${escHtml(t.name || 'Unnamed Faculty')}</div>
+          <div class="app-email">${escHtml(t.email)}</div>
+          ${compact ? '' : `<div style="font-size:0.6875rem;color:var(--text-3);margin-top:2px;">Employee ID: ${escHtml(t.employee_id||'—')}</div>`}
         </div>
         <div class="app-actions">
-          <button class="btn btn-success btn-sm" onclick="approveTeacher(${t.user_id}, 'approved')">
+          <button class="btn btn-success btn-sm" onclick="approveTeacher(${t.user_id},'approved')">
             <i data-lucide="check"></i>${compact ? '' : ' Approve'}
           </button>
-          <button class="btn btn-danger btn-sm" onclick="approveTeacher(${t.user_id}, 'rejected')">
+          <button class="btn btn-danger btn-sm" onclick="approveTeacher(${t.user_id},'rejected')">
             <i data-lucide="x"></i>${compact ? '' : ' Reject'}
           </button>
         </div>
@@ -276,28 +787,459 @@
   async function approveTeacher(userId, action) {
     try {
       const res  = await SAMS.apiFetch(`/api/admin/approve-teacher/${userId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: action })
+        method: 'PUT', body: JSON.stringify({ status: action })
       });
       const data = await res.json();
       if (res.ok) {
         SAMS.toast(action === 'approved' ? '✓ Faculty approved.' : 'Faculty rejected.', action === 'approved' ? 'success' : 'info');
-        const card = document.getElementById('approvalCard_' + userId);
-        if (card) card.remove();
+        document.getElementById('approvalCard_' + userId)?.remove();
         loadStats();
-      } else {
-        SAMS.toast(data.error || 'Action failed.', 'error');
-      }
-    } catch {
-      SAMS.toast('Network error.', 'error');
-    }
+      } else { SAMS.toast(data.error || 'Action failed.', 'error'); }
+    } catch { SAMS.toast('Network error.', 'error'); }
   }
   window.approveTeacher = approveTeacher;
+
+  /* ── At-risk overview card ── */
+  async function loadAtRiskQuick() {
+    try {
+      const res   = await SAMS.apiFetch('/api/admin/at-risk-students');
+      const data  = await res.json();
+      const list  = Array.isArray(data) ? data : [];
+      const el    = document.getElementById('atRiskQuickList');
+      if (!list.length) {
+        el.innerHTML = `<div class="empty-state" style="padding:0.75rem;"><div class="ei">✓</div><p>No at-risk students.</p></div>`;
+        return;
+      }
+      el.innerHTML = list.slice(0,4).map(s => `
+        <div style="display:flex;align-items:center;gap:0.625rem;padding:0.375rem 0;border-bottom:1px solid var(--border-light);">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.8125rem;font-weight:600;color:var(--text-1);">${escHtml(s.name)}</div>
+            <div style="font-size:0.6875rem;color:var(--text-3);">${escHtml(s.roll_number)}</div>
+          </div>
+          <span class="badge badge-danger">${s.percentage}%</span>
+        </div>`).join('') +
+        (list.length > 4 ? `<div style="padding-top:0.5rem;text-align:center;"><button class="btn btn-ghost btn-sm" onclick="gotoSection('atrisk',null)">View all ${list.length}</button></div>` : '');
+    } catch {}
+  }
+
+  /* ── Full students list ── */
+  let studentPage = 1;
+  let studentSearch = '';
+  async function loadStudents() {
+    const q = document.getElementById('studentSearch')?.value.trim() || '';
+    studentSearch = q;
+    try {
+      const res  = await SAMS.apiFetch(`/api/admin/students?search=${encodeURIComponent(q)}&page=${studentPage}&limit=30`);
+      const data = await res.json();
+      const rows = data.data || [];
+      const tbody = document.getElementById('studentsBody');
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">👤</div><h3>No students found</h3><p>${q ? 'No results for "' + escHtml(q) + '".' : 'No students registered yet.'}</p></div></td></tr>`;
+        document.getElementById('studentsMeta').textContent = '0 results';
+        document.getElementById('studentsPager').innerHTML = '';
+        return;
+      }
+      tbody.innerHTML = rows.map(s => {
+        const total = Number(s.total_classes) || 0;
+        const att   = Number(s.attended_classes) || 0;
+        const pct   = total > 0 ? ((att / total) * 100).toFixed(1) : '—';
+        const pctColor = total > 0 ? (pct >= 75 ? 'var(--success)' : 'var(--danger)') : 'var(--text-3)';
+        const statusBadge = s.status === 'approved' ? '<span class="badge badge-safe">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+        return `<tr>
+          <td data-label="Name"><div style="font-weight:600;">${escHtml(s.name)}</div></td>
+          <td data-label="Roll"><span style="font-family:var(--font-mono);font-size:0.8125rem;">${escHtml(s.roll_number)}</span></td>
+          <td data-label="Email"><span style="color:var(--text-2);">${escHtml(s.email)}</span></td>
+          <td data-label="Batch">${s.batch_year || '—'}</td>
+          <td data-label="Courses">${s.enrolled_courses}</td>
+          <td data-label="Attendance"><span style="font-weight:700;color:${pctColor};">${total > 0 ? pct + '%' : '—'}</span></td>
+          <td data-label="Status">${statusBadge}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('studentsMeta').textContent = `Showing ${rows.length} of ${data.total} students`;
+      renderPager('studentsPager', data.page, data.pages, (p) => { studentPage = p; loadStudents(); });
+    } catch { SAMS.toast('Could not load students.', 'error'); }
+  }
+  window.loadStudents = loadStudents;
+  let studentSearchTimer;
+  window.debouncedStudentSearch = () => { clearTimeout(studentSearchTimer); studentSearchTimer = setTimeout(() => { studentPage = 1; loadStudents(); }, 400); };
+
+  /* ── Full faculty list ── */
+  async function loadFaculty() {
+    const q = document.getElementById('facultySearch')?.value.trim() || '';
+    try {
+      const res  = await SAMS.apiFetch(`/api/admin/faculty?search=${encodeURIComponent(q)}`);
+      const rows = await res.json();
+      const tbody = document.getElementById('facultyBody');
+      if (!rows.length || !Array.isArray(rows)) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">👔</div><h3>No faculty found</h3><p>${q ? 'No results for "' + escHtml(q) + '".' : 'No faculty registered yet.'}</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(f => {
+        const statusBadge = f.status === 'approved' ? '<span class="badge badge-safe">Approved</span>' :
+                            f.status === 'pending'   ? '<span class="badge badge-warn">Pending</span>' :
+                                                       '<span class="badge badge-danger">Rejected</span>';
+        const toggleAction = f.status === 'approved'
+          ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserStatus(${f.user_id},'rejected','Suspend ${escHtml(f.name)}?')">Suspend</button>`
+          : `<button class="btn btn-ghost btn-sm" onclick="toggleUserStatus(${f.user_id},'approved','Activate ${escHtml(f.name)}?')">Activate</button>`;
+        return `<tr>
+          <td data-label="Name"><div style="font-weight:600;">${escHtml(f.name)}</div></td>
+          <td data-label="Employee ID"><span style="font-family:var(--font-mono);font-size:0.8125rem;">${escHtml(f.employee_id)}</span></td>
+          <td data-label="Email"><span style="color:var(--text-2);">${escHtml(f.email)}</span></td>
+          <td data-label="Designation">${escHtml(f.designation||'—')}</td>
+          <td data-label="Courses">${f.assigned_courses}</td>
+          <td data-label="Status">${statusBadge}</td>
+          <td data-label="Actions">${toggleAction}</td>
+        </tr>`;
+      }).join('');
+    } catch { SAMS.toast('Could not load faculty.', 'error'); }
+  }
+  window.loadFaculty = loadFaculty;
+  let facultySearchTimer;
+  window.debouncedFacultySearch = () => { clearTimeout(facultySearchTimer); facultySearchTimer = setTimeout(loadFaculty, 400); };
+
+  async function toggleUserStatus(userId, newStatus, title) {
+    showConfirm(title, `This will ${newStatus === 'approved' ? 'activate' : 'suspend'} the account.`, async () => {
+      try {
+        const res  = await SAMS.apiFetch(`/api/admin/users/${userId}/status`, { method:'PUT', body: JSON.stringify({ status: newStatus }) });
+        const data = await res.json();
+        if (res.ok) { SAMS.toast(data.message, 'success'); loadFaculty(); loadStats(); }
+        else SAMS.toast(data.error || 'Failed.', 'error');
+      } catch { SAMS.toast('Network error.', 'error'); }
+    });
+  }
+  window.toggleUserStatus = toggleUserStatus;
+
+  /* ── Courses CRUD ── */
+  let allDepts = [];
+  let editingCourseId = null;
+
+  async function loadCourses() {
+    const q = document.getElementById('coursesSearch')?.value.trim() || '';
+    try {
+      const res  = await SAMS.apiFetch(`/api/admin/courses?search=${encodeURIComponent(q)}`);
+      const rows = await res.json();
+      const tbody = document.getElementById('coursesBody');
+      if (!rows.length || !Array.isArray(rows)) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">📚</div><h3>No courses found</h3><p>${q ? 'No results for "' + escHtml(q) + '".' : 'No courses created yet.'}</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(c => `<tr>
+        <td data-label="Code"><span style="font-family:var(--font-mono);font-weight:600;">${escHtml(c.course_code)}</span></td>
+        <td data-label="Name">${escHtml(c.course_name)}</td>
+        <td data-label="Dept"><span class="badge badge-muted">${escHtml(c.dept_code)}</span> ${escHtml(c.dept_name)}</td>
+        <td data-label="Students">${c.student_count}</td>
+        <td data-label="Faculty">${c.faculty_count}</td>
+        <td data-label="Sessions">${c.session_count}</td>
+        <td data-label="Actions">
+          <div style="display:flex;gap:0.375rem;">
+            <button class="btn btn-ghost btn-sm" onclick="openCourseModal(${c.course_id},'${escAttr(c.course_code)}','${escAttr(c.course_name)}',${c.dept_id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCourse(${c.course_id},'${escAttr(c.course_name)}')">Delete</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    } catch { SAMS.toast('Could not load courses.', 'error'); }
+  }
+  window.loadCourses = loadCourses;
+  let coursesSearchTimer;
+  window.debouncedCoursesSearch = () => { clearTimeout(coursesSearchTimer); coursesSearchTimer = setTimeout(loadCourses, 400); };
+
+  function openCourseModal(id, code, name, deptId) {
+    editingCourseId = id || null;
+    document.getElementById('courseModalTitle').textContent = id ? 'Edit Course' : 'New Course';
+    document.getElementById('courseCode').value = code || '';
+    document.getElementById('courseName').value = name || '';
+    document.getElementById('courseModalNotice').className = 'notice';
+    document.getElementById('courseModalNotice').textContent = '';
+    // Populate departments
+    const sel = document.getElementById('courseDept');
+    sel.innerHTML = '<option value="">— Select department —</option>' +
+      allDepts.map(d => `<option value="${d.dept_id}" ${d.dept_id == deptId ? 'selected' : ''}>${escHtml(d.dept_code)} — ${escHtml(d.dept_name)}</option>`).join('');
+    document.getElementById('courseModal').classList.add('show');
+    lucide.createIcons();
+  }
+  window.openCourseModal = openCourseModal;
+
+  function closeCourseModal() { document.getElementById('courseModal').classList.remove('show'); editingCourseId = null; }
+  window.closeCourseModal = closeCourseModal;
+
+  async function saveCourse() {
+    const code   = document.getElementById('courseCode').value.trim();
+    const name   = document.getElementById('courseName').value.trim();
+    const deptId = document.getElementById('courseDept').value;
+    const notice = document.getElementById('courseModalNotice');
+    if (!code) { showNotice(notice, 'Course code is required.', 'error'); return; }
+    if (!name) { showNotice(notice, 'Course name is required.', 'error'); return; }
+    if (!deptId) { showNotice(notice, 'Please select a department.', 'error'); return; }
+
+    const btn = document.getElementById('saveCourseBtn');
+    btn.disabled = true;
+    try {
+      const url    = editingCourseId ? `/api/admin/courses/${editingCourseId}` : '/api/admin/courses';
+      const method = editingCourseId ? 'PUT' : 'POST';
+      const res    = await SAMS.apiFetch(url, { method, body: JSON.stringify({ course_code: code, course_name: name, dept_id: deptId }) });
+      const data   = await res.json();
+      if (res.ok) {
+        SAMS.toast(data.message || 'Course saved.', 'success');
+        closeCourseModal();
+        loadCourses();
+        loadStats();
+      } else { showNotice(notice, data.error || 'Failed to save course.', 'error'); }
+    } catch { showNotice(notice, 'Network error.', 'error'); }
+    finally { btn.disabled = false; }
+  }
+  window.saveCourse = saveCourse;
+
+  async function deleteCourse(id, name) {
+    showConfirm('Delete Course?', `Delete "${name}"? This is permanent and cannot be undone. Courses with enrollments or sessions cannot be deleted.`, async () => {
+      try {
+        const res  = await SAMS.apiFetch(`/api/admin/courses/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) { SAMS.toast(data.message, 'success'); loadCourses(); loadStats(); }
+        else SAMS.toast(data.error || 'Failed to delete.', 'error');
+      } catch { SAMS.toast('Network error.', 'error'); }
+    });
+  }
+  window.deleteCourse = deleteCourse;
+
+  /* ── Departments ── */
+  async function loadDepartments() {
+    try {
+      const res  = await SAMS.apiFetch('/api/admin/departments');
+      const rows = await res.json();
+      allDepts = Array.isArray(rows) ? rows : [];
+      const tbody = document.getElementById('deptsBody');
+      if (!tbody) return;
+      if (!allDepts.length) {
+        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="ei">🏢</div><p>No departments found.</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = allDepts.map(d => `<tr>
+        <td data-label="Code"><span class="badge badge-muted">${escHtml(d.dept_code)}</span></td>
+        <td data-label="Name">${escHtml(d.dept_name)}</td>
+        <td data-label="Courses">${d.course_count}</td>
+        <td data-label="Students">${d.student_count}</td>
+      </tr>`).join('');
+    } catch { SAMS.toast('Could not load departments.', 'error'); }
+  }
+  window.loadDepartments = loadDepartments;
+
+  async function addDepartment() {
+    const code   = document.getElementById('deptCode').value.trim().toUpperCase();
+    const name   = document.getElementById('deptName').value.trim();
+    const notice = document.getElementById('deptNotice');
+    if (!code || code.length < 2) { showNotice(notice, 'Department code is required (min 2 chars).', 'error'); return; }
+    if (!name || name.length < 2) { showNotice(notice, 'Department name is required.', 'error'); return; }
+    try {
+      const res  = await SAMS.apiFetch('/api/admin/departments', { method:'POST', body: JSON.stringify({ dept_code: code, dept_name: name }) });
+      const data = await res.json();
+      if (res.ok) {
+        showNotice(notice, '✓ Department created.', 'success');
+        document.getElementById('deptCode').value = '';
+        document.getElementById('deptName').value = '';
+        loadDepartments();
+        loadStats();
+      } else { showNotice(notice, data.error || 'Failed.', 'error'); }
+    } catch { showNotice(notice, 'Network error.', 'error'); }
+  }
+  window.addDepartment = addDepartment;
+
+  /* ── Attendance Monitoring ── */
+  let monitorPage = 1;
+  async function loadMonitoringCourses() {
+    try {
+      const res  = await SAMS.apiFetch('/api/admin/courses');
+      const rows = await res.json();
+      const sel  = document.getElementById('monitorCourseFilter');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">All Courses</option>' +
+        (Array.isArray(rows) ? rows.map(c => `<option value="${c.course_id}">${escHtml(c.course_code)} — ${escHtml(c.course_name)}</option>`).join('') : '');
+    } catch {}
+  }
+
+  async function loadMonitoring() {
+    const q  = document.getElementById('monitorSearch')?.value.trim() || '';
+    const cId = document.getElementById('monitorCourseFilter')?.value || '';
+    try {
+      const url = `/api/admin/attendance-monitoring?page=${monitorPage}&limit=30&search=${encodeURIComponent(q)}&course_id=${cId}`;
+      const res  = await SAMS.apiFetch(url);
+      const data = await res.json();
+      const rows = data.data || [];
+      const tbody = document.getElementById('monitoringBody');
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="ei">📋</div><h3>No data</h3><p>No attendance records found.</p></div></td></tr>`;
+        document.getElementById('monitorMeta').textContent = '0 results';
+        document.getElementById('monitorPager').innerHTML = '';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const pctColor = r.percentage >= 75 ? 'var(--success)' : 'var(--danger)';
+        const badge = statusBadge(r.status);
+        return `<tr>
+          <td data-label="Student"><div style="font-weight:600;">${escHtml(r.name)}</div></td>
+          <td data-label="Roll"><span style="font-family:var(--font-mono);font-size:0.8125rem;">${escHtml(r.roll_number)}</span></td>
+          <td data-label="Course"><span class="badge badge-muted">${escHtml(r.course_code)}</span> ${escHtml(r.course_name)}</td>
+          <td data-label="Total">${r.total_sessions}</td>
+          <td data-label="Present" style="color:var(--success);font-weight:600;">${r.attended}</td>
+          <td data-label="Absent" style="color:var(--danger);">${Number(r.total_sessions) - Number(r.attended)}</td>
+          <td data-label="Attendance"><span style="font-weight:700;color:${pctColor};">${r.percentage}%</span></td>
+          <td data-label="Status">${badge}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('monitorMeta').textContent = `Showing ${rows.length} of ${data.total}`;
+      renderPager('monitorPager', data.page, data.pages, (p) => { monitorPage = p; loadMonitoring(); });
+    } catch { SAMS.toast('Could not load monitoring data.', 'error'); }
+  }
+  window.loadMonitoring = loadMonitoring;
+  let monitorSearchTimer;
+  window.debouncedMonitorSearch = () => { clearTimeout(monitorSearchTimer); monitorSearchTimer = setTimeout(() => { monitorPage = 1; loadMonitoring(); }, 400); };
+
+  /* ── At-risk students ── */
+  async function loadAtRisk() {
+    try {
+      const res  = await SAMS.apiFetch('/api/admin/at-risk-students');
+      const list = await res.json();
+      const arr  = Array.isArray(list) ? list : [];
+      document.getElementById('atRiskCount').textContent = arr.length;
+      const tbody = document.getElementById('atRiskBody');
+      if (!arr.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="ei">✓</div><h3>No at-risk students</h3><p>All students are above the attendance threshold.</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = arr.map(s => {
+        const badge = statusBadge(s.status);
+        return `<tr>
+          <td data-label="Name"><div style="font-weight:600;">${escHtml(s.name)}</div></td>
+          <td data-label="Roll"><span style="font-family:var(--font-mono);font-size:0.8125rem;">${escHtml(s.roll_number)}</span></td>
+          <td data-label="Email"><span style="color:var(--text-2);">${escHtml(s.email)}</span></td>
+          <td data-label="Batch">${s.batch_year || '—'}</td>
+          <td data-label="Attendance">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-weight:700;color:var(--danger);">${s.percentage}%</span>
+              <div class="at-risk-bar" style="width:60px;"><div class="at-risk-bar-fill" style="width:${Math.min(s.percentage,100)}%;"></div></div>
+            </div>
+          </td>
+          <td data-label="Need to Attend"><span style="font-weight:600;color:var(--danger);">${s.needToAttend} class${s.needToAttend===1?'':'es'}</span></td>
+          <td data-label="Status">${badge}</td>
+        </tr>`;
+      }).join('');
+    } catch { SAMS.toast('Could not load at-risk students.', 'error'); }
+  }
+  window.loadAtRisk = loadAtRisk;
+
+  /* ── Audit logs ── */
+  let auditPage = 1;
+  async function loadAuditLogs() {
+    const q = document.getElementById('auditSearch')?.value.trim() || '';
+    try {
+      const res  = await SAMS.apiFetch(`/api/admin/audit-logs?page=${auditPage}&limit=50&search=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      const rows = data.data || [];
+      const tbody = document.getElementById('auditBody');
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="ei">📋</div><h3>No audit logs</h3><p>No actions recorded yet.</p></div></td></tr>`;
+        document.getElementById('auditMeta').textContent = '0 results';
+        document.getElementById('auditPager').innerHTML = '';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const dt = r.created_at ? new Date(r.created_at).toLocaleString('en-IN', { dateStyle:'short', timeStyle:'short' }) : '—';
+        return `<tr>
+          <td data-label="Time" style="font-size:0.75rem;color:var(--text-3);white-space:nowrap;">${dt}</td>
+          <td data-label="User"><div style="font-size:0.8125rem;font-weight:500;">${escHtml(r.user_name||r.email||'System')}</div></td>
+          <td data-label="Role"><span class="badge badge-muted">${escHtml(r.role||'—')}</span></td>
+          <td data-label="Action"><span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--primary);">${escHtml(r.action)}</span></td>
+          <td data-label="Entity">${r.entity_type ? `<span class="badge badge-info">${escHtml(r.entity_type)} ${r.entity_id||''}</span>` : '—'}</td>
+          <td data-label="Details" style="font-size:0.75rem;color:var(--text-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.detail ? JSON.stringify(JSON.parse(r.detail)) : '—'}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('auditMeta').textContent = `${rows.length} of ${data.total} entries`;
+      renderPager('auditPager', data.page, data.pages, (p) => { auditPage = p; loadAuditLogs(); });
+    } catch { SAMS.toast('Could not load audit logs.', 'error'); }
+  }
+  window.loadAuditLogs = loadAuditLogs;
+  let auditSearchTimer;
+  window.debouncedAuditSearch = () => { clearTimeout(auditSearchTimer); auditSearchTimer = setTimeout(() => { auditPage = 1; loadAuditLogs(); }, 400); };
+
+  /* ── Settings ── */
+  async function loadSettings() {
+    try {
+      const res  = await SAMS.apiFetch('/api/admin/settings');
+      const data = await res.json();
+      document.getElementById('settingThreshold').value = data.attendance_threshold ?? 75;
+      document.getElementById('settingYear').value      = data.academic_year ?? '';
+      document.getElementById('settingSemester').value  = data.current_semester ?? '';
+      document.getElementById('settingQrMax').value     = data.qr_max_duration ?? 60;
+    } catch { SAMS.toast('Could not load settings.', 'error'); }
+  }
+  async function saveSettings() {
+    const body = {
+      attendance_threshold: document.getElementById('settingThreshold').value,
+      academic_year:        document.getElementById('settingYear').value.trim(),
+      current_semester:     document.getElementById('settingSemester').value.trim(),
+      qr_max_duration:      document.getElementById('settingQrMax').value,
+    };
+    const notice = document.getElementById('settingsNotice');
+    try {
+      const res  = await SAMS.apiFetch('/api/admin/settings', { method:'PUT', body: JSON.stringify(body) });
+      const data = await res.json();
+      if (res.ok) showNotice(notice, '✓ Settings saved.', 'success');
+      else showNotice(notice, data.error || 'Failed.', 'error');
+    } catch { showNotice(notice, 'Network error.', 'error'); }
+  }
+  window.saveSettings = saveSettings;
+
+  /* ── Confirm modal ── */
+  let confirmCallback = null;
+  function showConfirm(title, msg, callback) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent   = msg;
+    confirmCallback = callback;
+    document.getElementById('confirmModal').classList.add('show');
+    lucide.createIcons();
+  }
+  function closeConfirm() { document.getElementById('confirmModal').classList.remove('show'); confirmCallback = null; }
+  async function executeConfirm() { closeConfirm(); if (confirmCallback) await confirmCallback(); }
+  window.closeConfirm  = closeConfirm;
+  window.executeConfirm = executeConfirm;
+
+  /* ── Pager helper ── */
+  function renderPager(containerId, page, pages, onPage) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    const prev = page > 1   ? `<button class="page-num-btn" onclick="(${onPage.toString()})(${page-1})">‹</button>` : '';
+    const next = page < pages ? `<button class="page-num-btn" onclick="(${onPage.toString()})(${page+1})">›</button>` : '';
+    const nums = [];
+    for (let i = Math.max(1, page-2); i <= Math.min(pages, page+2); i++) {
+      nums.push(`<button class="page-num-btn${i===page?' active':''}" onclick="(${onPage.toString()})(${i})">${i}</button>`);
+    }
+    el.innerHTML = prev + nums.join('') + next;
+  }
+
+  /* ── Utility helpers ── */
+  function escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(str) { return String(str||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+  function showNotice(el, msg, type) {
+    el.textContent  = msg;
+    el.className    = `notice show ${type}`;
+    setTimeout(() => { el.className = 'notice'; }, 4000);
+  }
+  function statusBadge(status) {
+    const map = {
+      safe:           '<span class="badge badge-safe">Safe</span>',
+      near_threshold: '<span class="badge badge-warn">Near Threshold</span>',
+      at_risk:        '<span class="badge badge-danger">At Risk</span>',
+      critical:       '<span class="badge badge-danger">Critical</span>',
+      no_classes:     '<span class="badge badge-muted">No Data</span>',
+    };
+    return map[status] || '<span class="badge badge-muted">—</span>';
+  }
 
   /* ── Init ── */
   loadUser();
   loadStats();
   loadPendingTeachers();
+  loadAtRiskQuick();
   lucide.createIcons();
 })();
 </script>

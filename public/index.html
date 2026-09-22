@@ -3,151 +3,145 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SATT — Student Attendance Threshold Tracker</title>
-  <meta name="description" content="University academic attendance management portal. Students, faculty, and administrators log in here.">
+  <title>SATT — University Academic Portal</title>
+  <meta name="description" content="University academic attendance management portal.">
   <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
-<body>
+<body class="auth-body">
 
-<div class="auth-page">
+<div class="auth-page-new">
 
-  <!-- ══ LEFT: Academic Identity Panel ═══════════════════════ -->
-  <div class="auth-hero">
-    <div class="hero-brand">
-      <div class="hero-logo">S</div>
-      <div>
-        <div class="hero-logo-text">SATT</div>
-        <span class="hero-logo-sub">Academic Portal</span>
+  <!-- ══ LEFT: Majestic University Imagery/Hero ═══════════════ -->
+  <div class="auth-hero-new">
+    <div class="hero-overlay-new"></div>
+    <div class="hero-content-new">
+      <div class="uni-seal-new">
+        <i data-lucide="library" style="width:36px;height:36px;stroke-width:1.5px;"></i>
       </div>
-    </div>
-
-    <div class="hero-body">
-      <div class="hero-pill">University Attendance System</div>
-      <h1>Track. Manage.<br><em>Graduate on time.</em></h1>
-      <p>Real-time attendance monitoring, threshold alerts, and automated reporting for students, faculty, and administration.</p>
-
-      <div class="hero-features">
-        <div class="hero-feat">
-          <div class="hero-feat-icon">📊</div>
-          <span>Per-subject breakdown with live threshold calculation — know your standing before it's too late.</span>
+      <h1 class="hero-title-new">University<br>Academic Portal</h1>
+      <p class="hero-sub-new">The centralized system for attendance tracking, condonation requests, and academic monitoring.</p>
+      
+      <div class="hero-metrics-new">
+        <div class="metric-item-new">
+          <div class="metric-val-new">75%</div>
+          <div class="metric-lbl-new">Required threshold</div>
         </div>
-        <div class="hero-feat">
-          <div class="hero-feat-icon">📷</div>
-          <span>QR-code based session marking — faculty generate, students scan, records are instant.</span>
+        <div class="metric-item-new">
+          <div class="metric-val-new">Real-time</div>
+          <div class="metric-lbl-new">Data syncing</div>
         </div>
-        <div class="hero-feat">
-          <div class="hero-feat-icon">📄</div>
-          <span>One-click PDF reports for condonation requests and departmental review.</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="hero-stats">
-      <div>
-        <div class="hero-stat-n">75%</div>
-        <div class="hero-stat-l">Required threshold</div>
-      </div>
-      <div>
-        <div class="hero-stat-n">3</div>
-        <div class="hero-stat-l">Role types</div>
-      </div>
-      <div>
-        <div class="hero-stat-n">Real‑time</div>
-        <div class="hero-stat-l">Attendance tracking</div>
       </div>
     </div>
   </div>
 
-  <!-- ══ RIGHT: Auth Form ═════════════════════════════════════ -->
-  <div class="auth-panel">
-    <button class="theme-corner" id="themeToggle" aria-label="Toggle theme" title="Toggle dark/light mode">☀</button>
-
-    <div class="auth-form-wrap">
-
-      <!-- Institution mark -->
-      <div class="auth-top-logo">
-        <div class="auth-logo-sq">S</div>
-        <div>
-          <div class="auth-logo-label">SATT</div>
-          <span class="auth-logo-sub">Student Attendance Threshold Tracker</span>
+  <!-- ══ RIGHT: Refined Auth Panel ════════════════════════════ -->
+  <div class="auth-panel-new">
+    <button class="theme-btn-new" id="themeToggle" aria-label="Toggle theme">
+      <i data-lucide="moon"></i>
+    </button>
+    
+    <div class="auth-box-new">
+      <div class="auth-brand-new">
+        <div class="auth-logo-new">S</div>
+        <div class="auth-brand-text-new">
+          <div class="brand-title-new">SATT</div>
+          <div class="brand-sub-new">Student Attendance Threshold Tracker</div>
         </div>
       </div>
 
-      <!-- Tab switcher -->
-      <div class="auth-tabs">
-        <button class="auth-tab active" id="tabLogin"    onclick="switchTab('login')">Sign In</button>
-        <button class="auth-tab"        id="tabRegister" onclick="switchTab('register')">Register</button>
+      <div class="auth-tabs-new">
+        <button class="auth-tab-new active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+        <button class="auth-tab-new" id="tabRegister" onclick="switchTab('register')">Register</button>
       </div>
 
-      <!-- ── LOGIN SECTION ── -->
-      <div class="auth-section active" id="loginSection">
-        <h2 class="auth-title">Welcome back</h2>
-        <p class="auth-sub">Sign in to your university portal account.</p>
-
+      <!-- ── LOGIN ── -->
+      <div class="auth-section-new active" id="loginSection">
+        <div class="auth-header-new">
+          <h2>Welcome back</h2>
+          <p>Please sign in to access your portal.</p>
+        </div>
         <form id="loginForm">
-          <div class="form-group">
-            <label class="form-label" for="loginEmail">Email address</label>
-            <input class="form-input" id="loginEmail" type="email" placeholder="you@university.edu" autocomplete="email" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="loginPassword">Password</label>
-            <div class="input-row">
-              <input class="form-input" id="loginPassword" type="password" placeholder="Your password" autocomplete="current-password" required>
-              <button type="button" class="input-toggle" id="loginPwToggle" data-for="loginPassword">Show</button>
+          <div class="form-group-new">
+            <label for="loginEmail">Institutional Email</label>
+            <div class="input-icon-wrap">
+              <i data-lucide="mail"></i>
+              <input type="email" id="loginEmail" placeholder="you@university.edu" required autocomplete="email">
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:0.25rem;">
-            Sign In
+          <div class="form-group-new">
+            <label for="loginPassword">Password</label>
+            <div class="input-icon-wrap">
+              <i data-lucide="lock"></i>
+              <input type="password" id="loginPassword" placeholder="Your password" required autocomplete="current-password">
+              <button type="button" class="pw-toggle-new" data-for="loginPassword">Show</button>
+            </div>
+          </div>
+          <button type="submit" class="btn-submit-new" id="loginBtn">
+            Sign In <i data-lucide="arrow-right"></i>
           </button>
         </form>
-        <div id="loginNotice" class="notice"></div>
+        <div id="loginNotice" class="notice-new"></div>
       </div>
 
-      <!-- ── REGISTER SECTION ── -->
-      <div class="auth-section" id="registerSection">
-        <h2 class="auth-title">Create an account</h2>
-        <p class="auth-sub">Register with your institutional email address.</p>
-
+      <!-- ── REGISTER ── -->
+      <div class="auth-section-new" id="registerSection">
+        <div class="auth-header-new">
+          <h2>Create Account</h2>
+          <p>Register with your university credentials.</p>
+        </div>
         <form id="registerForm">
-          <div class="form-group">
-            <label class="form-label" for="regName">Full name</label>
-            <input class="form-input" id="regName" type="text" placeholder="Your full name" autocomplete="name" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="regEmail">Email address</label>
-            <input class="form-input" id="regEmail" type="email" placeholder="you@university.edu" autocomplete="email" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="regPassword">Password</label>
-            <div class="input-row">
-              <input class="form-input" id="regPassword" type="password" placeholder="Min. 8 characters" minlength="8" required>
-              <button type="button" class="input-toggle" data-for="regPassword">Show</button>
+          <div class="form-group-new">
+            <label for="regName">Full Name</label>
+            <div class="input-icon-wrap">
+              <i data-lucide="user"></i>
+              <input type="text" id="regName" placeholder="Your legal name" required autocomplete="name">
             </div>
-            <div class="pw-bar" id="regPwBar"><span></span><span></span><span></span></div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Account type</label>
-            <div class="role-grid">
-              <div class="role-opt">
-                <input type="radio" name="regRole" id="roleStudent" value="student" checked>
-                <label for="roleStudent"><span class="ico">🎓</span> Student</label>
-              </div>
-              <div class="role-opt">
-                <input type="radio" name="regRole" id="roleFaculty" value="faculty">
-                <label for="roleFaculty"><span class="ico">👨‍🏫</span> Faculty</label>
-              </div>
+          <div class="form-group-new">
+            <label for="regEmail">Institutional Email</label>
+            <div class="input-icon-wrap">
+              <i data-lucide="mail"></i>
+              <input type="email" id="regEmail" placeholder="you@university.edu" required autocomplete="email">
             </div>
-            <p class="faculty-info" id="facultyNote">Faculty accounts require admin approval before activation.</p>
           </div>
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="registerBtn" style="margin-top:0.25rem;">
-            Create Account
+          <div class="form-group-new">
+            <label for="regPassword">Password</label>
+            <div class="input-icon-wrap">
+              <i data-lucide="lock"></i>
+              <input type="password" id="regPassword" placeholder="Min 8 characters" minlength="8" required>
+              <button type="button" class="pw-toggle-new" data-for="regPassword">Show</button>
+            </div>
+          </div>
+          <div class="form-group-new">
+            <label>Account Type</label>
+            <div class="role-boxes-new">
+              <label class="role-box-new">
+                <input type="radio" name="regRole" value="student" checked>
+                <div class="role-box-content">
+                  <i data-lucide="graduation-cap"></i>
+                  <span>Student</span>
+                </div>
+              </label>
+              <label class="role-box-new">
+                <input type="radio" name="regRole" value="faculty">
+                <div class="role-box-content">
+                  <i data-lucide="book-open"></i>
+                  <span>Faculty</span>
+                </div>
+              </label>
+            </div>
+            <p class="faculty-note-new" id="facultyNote">Faculty accounts require administrative approval before activation.</p>
+          </div>
+          <button type="submit" class="btn-submit-new" id="registerBtn">
+            Register Account <i data-lucide="arrow-right"></i>
           </button>
         </form>
-        <div id="registerNotice" class="notice"></div>
+        <div id="registerNotice" class="notice-new"></div>
       </div>
-
-      <div class="auth-footer">
-        Secure · Role-based Access · Session Protected
+      
+      <div class="auth-footer-new">
+        <i data-lucide="shield-check"></i> Secure University Portal
       </div>
     </div>
   </div>
@@ -157,9 +151,28 @@
 <script>
 (function () {
   'use strict';
+  lucide.createIcons();
   SAMS.initTheme();
+  
+  // Custom theme toggle for the new icon button
+  const themeBtn = document.getElementById('themeToggle');
+  if(themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const newTheme = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('sams_theme', newTheme);
+      themeBtn.innerHTML = newTheme === 'dark' ? '<i data-lucide="sun"></i>' : '<i data-lucide="moon"></i>';
+      lucide.createIcons();
+    });
+    // Set initial icon
+    if(document.documentElement.getAttribute('data-theme') === 'dark') {
+      themeBtn.innerHTML = '<i data-lucide="sun"></i>';
+      lucide.createIcons();
+    }
+  }
+
   if (SAMS.getToken()) {
-    // Already logged in — redirect based on stored role
     const pay = SAMS.decodeJWT(SAMS.getToken());
     if (pay && pay.role) {
       const dest = { admin: '/admin/admin_dashboard.html', faculty: '/faculty/faculty_dashboard.html', student: '/student/student_dashboard.html' };
@@ -167,7 +180,6 @@
     }
   }
 
-  /* ── Tab switcher ── */
   function switchTab(tab) {
     document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
     document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
@@ -176,8 +188,7 @@
   }
   window.switchTab = switchTab;
 
-  /* ── Password toggles ── */
-  document.querySelectorAll('.input-toggle').forEach(btn => {
+  document.querySelectorAll('.pw-toggle-new').forEach(btn => {
     btn.addEventListener('click', () => {
       const inp = document.getElementById(btn.dataset.for);
       if (!inp) return;
@@ -187,17 +198,6 @@
     });
   });
 
-  /* ── Password strength ── */
-  document.getElementById('regPassword').addEventListener('input', function () {
-    const v = this.value;
-    let s = 0;
-    if (v.length >= 8) s++;
-    if (/\d/.test(v) && /[a-zA-Z]/.test(v)) s++;
-    if (v.length >= 12 && /[^a-zA-Z0-9]/.test(v)) s++;
-    document.getElementById('regPwBar').className = 'pw-bar' + (v ? ['',' weak',' fair',' strong'][s] : '');
-  });
-
-  /* ── Faculty note ── */
   document.querySelectorAll('input[name="regRole"]').forEach(r => {
     r.addEventListener('change', () => {
       const note = document.getElementById('facultyNote');
@@ -205,14 +205,13 @@
     });
   });
 
-  /* ── Notice helper ── */
   function setNotice(id, msg, type) {
     const el = document.getElementById(id);
     el.textContent = msg;
-    el.className = 'notice show ' + type;
+    el.className = 'notice-new show ' + type;
   }
   function clearNotice(id) {
-    document.getElementById(id).className = 'notice';
+    document.getElementById(id).className = 'notice-new';
   }
 
   /* ── LOGIN ── */
@@ -221,7 +220,9 @@
     clearNotice('loginNotice');
     const btn = document.getElementById('loginBtn');
     btn.disabled = true;
-    btn.textContent = 'Signing in…';
+    const oldHtml = btn.innerHTML;
+    btn.innerHTML = 'Signing in... <i data-lucide="loader" class="spin"></i>';
+    lucide.createIcons();
     try {
       const res  = await fetch('/login', {
         method: 'POST',
@@ -243,7 +244,8 @@
       setNotice('loginNotice', 'Network error. Please try again.', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Sign In';
+      btn.innerHTML = oldHtml;
+      lucide.createIcons();
     }
   });
 
@@ -254,7 +256,9 @@
     const role = document.querySelector('input[name="regRole"]:checked')?.value || 'student';
     const btn = document.getElementById('registerBtn');
     btn.disabled = true;
-    btn.textContent = 'Creating account…';
+    const oldHtml = btn.innerHTML;
+    btn.innerHTML = 'Creating account... <i data-lucide="loader" class="spin"></i>';
+    lucide.createIcons();
     try {
       const res  = await fetch('/register', {
         method: 'POST',
@@ -285,7 +289,8 @@
       setNotice('registerNotice', 'Network error. Please try again.', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Create Account';
+      btn.innerHTML = oldHtml;
+      lucide.createIcons();
     }
   });
 })();
