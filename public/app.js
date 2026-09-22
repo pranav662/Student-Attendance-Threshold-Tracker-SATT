@@ -89,36 +89,57 @@
 
     /* ── Theme ─────────────────────────────────────────────── */
     function applyTheme(theme) {
-        // Determine effective theme
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = theme === 'dark' || (!theme && prefersDark) || (!theme && !prefersDark === false);
-        const effective = (theme === 'light') ? 'light' : 'dark';
-
+        const effective = theme === 'dark' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', effective);
+        const isDark = effective === 'dark';
 
-        // Update all toggle buttons on the page
         document.querySelectorAll('#themeToggle').forEach(btn => {
-            btn.textContent = effective === 'dark' ? '☀' : '☾';
-            btn.setAttribute('aria-label', effective === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+            btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            btn.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            btn.innerHTML = isDark
+                ? '<i data-lucide="sun"></i>'
+                : '<i data-lucide="moon"></i>';
         });
+        if (window.lucide && typeof lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
     }
 
     function initTheme() {
         const saved = localStorage.getItem(THEME_KEY);
-        applyTheme(saved || 'light'); // Default to light (academic portal)
+        applyTheme(saved || 'light');
 
-        // Wire up ALL theme toggle buttons on this page
         document.querySelectorAll('#themeToggle').forEach(btn => {
-            // Remove old listeners by cloning
-            const clone = btn.cloneNode(true);
-            btn.parentNode.replaceChild(clone, btn);
-            clone.addEventListener('click', () => {
-                const current = document.documentElement.getAttribute('data-theme') || 'dark';
+            if (btn.dataset.themeBound === '1') return;
+            btn.dataset.themeBound = '1';
+            btn.addEventListener('click', () => {
+                const current = document.documentElement.getAttribute('data-theme') || 'light';
                 const next    = current === 'dark' ? 'light' : 'dark';
                 localStorage.setItem(THEME_KEY, next);
                 applyTheme(next);
             });
         });
+    }
+
+    /* ── Attendance threshold math (mirrors server calcThreshold) ── */
+    function calcThreshold(attended, total, threshold) {
+        attended = Math.max(0, Number(attended) || 0);
+        total    = Math.max(0, Number(total) || 0);
+        threshold = Number(threshold);
+        if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 100) threshold = 75;
+        const pct = total === 0 ? 0 : Number(((Math.min(attended, total) / total) * 100).toFixed(2));
+        const t = threshold / 100;
+        let status = 'no_classes', canMiss = 0, needToAttend = 0;
+        if (total > 0) {
+            if (pct >= threshold) {
+                status = pct >= Math.min(100, threshold + 10) ? 'safe' : 'near_threshold';
+                canMiss = Math.max(0, Math.floor((attended - t * total) / t));
+            } else {
+                status = pct >= Math.max(0, threshold - 15) ? 'at_risk' : 'critical';
+                needToAttend = t >= 1 ? 0 : Math.max(0, Math.ceil((t * total - attended) / (1 - t)));
+            }
+        }
+        return { percentage: pct, status, threshold, canMiss, needToAttend, attended, total };
     }
 
     /* ── Escape HTML ───────────────────────────────────────── */
@@ -144,6 +165,6 @@
     window.SAMS = {
         getToken, setToken, requireAuth, logout,
         toast, apiFetch, initTheme, consumeFlash,
-        escapeHTML, decodeJWT
+        escapeHTML, decodeJWT, calcThreshold
     };
 })();

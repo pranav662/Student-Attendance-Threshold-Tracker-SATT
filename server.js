@@ -118,21 +118,42 @@ async function auditLog(userId, role, action, entityType = null, entityId = null
 // Attendance Threshold Engine
 // ==========================================
 const ATTENDANCE_THRESHOLD = 75;
+let thresholdCache = { value: ATTENDANCE_THRESHOLD, at: 0 };
 
-function calcThreshold(attended, total) {
+async function getAttendanceThreshold() {
+  if (Date.now() - thresholdCache.at < 15_000) return thresholdCache.value;
+  try {
+    const [rows] = await pool.execute(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'attendance_threshold' LIMIT 1"
+    );
+    const n = Number(rows[0]?.setting_value);
+    if (Number.isFinite(n) && n > 0 && n <= 100) {
+      thresholdCache = { value: n, at: Date.now() };
+      return n;
+    }
+  } catch {}
+  thresholdCache = { value: ATTENDANCE_THRESHOLD, at: Date.now() };
+  return ATTENDANCE_THRESHOLD;
+}
+
+function calcThreshold(attended, total, threshold = ATTENDANCE_THRESHOLD) {
+  attended = Number(attended) || 0;
+  total = Number(total) || 0;
+  threshold = Number(threshold);
+  if (!Number.isFinite(threshold) || threshold <= 0 || threshold > 100) threshold = ATTENDANCE_THRESHOLD;
   const pct = total === 0 ? 0 : Number(((attended / total) * 100).toFixed(2));
-  const t = ATTENDANCE_THRESHOLD / 100;
+  const t = threshold / 100;
   let status = 'no_classes', canMiss = 0, needToAttend = 0;
   if (total > 0) {
-    if (pct >= ATTENDANCE_THRESHOLD) {
-      status = pct >= 85 ? 'safe' : 'near_threshold';
+    if (pct >= threshold) {
+      status = pct >= Math.min(100, threshold + 10) ? 'safe' : 'near_threshold';
       canMiss = Math.max(0, Math.floor((attended - t * total) / t));
     } else {
-      status = pct >= 60 ? 'at_risk' : 'critical';
-      needToAttend = Math.max(0, Math.ceil((t * total - attended) / (1 - t)));
+      status = pct >= Math.max(0, threshold - 15) ? 'at_risk' : 'critical';
+      needToAttend = t >= 1 ? 0 : Math.max(0, Math.ceil((t * total - attended) / (1 - t)));
     }
   }
-  return { percentage: pct, status, threshold: ATTENDANCE_THRESHOLD, canMiss, needToAttend };
+  return { percentage: pct, status, threshold, canMiss, needToAttend };
 }
 
 // ── User creation helpers ──────────────────────────────────
@@ -324,8 +345,8 @@ app.get('/api/admin/students', authenticate, requireRole('admin'), async (req, r
                JOIN enrollments e ON e.course_id = se.course_id WHERE e.student_id = s.student_id) AS total_classes
        FROM students s JOIN users u ON u.user_id = s.user_id
        ${whereClause}
-       ORDER BY s.name LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY s.name LIMIT ${limit} OFFSET ${offset}`,
+      params
     );
     return res.json({ data: rows, total, page, limit, pages: Math.ceil(total / limit) });
   } catch (error) { return next(error); }
@@ -515,6 +536,7 @@ app.delete('/api/admin/courses/:id', authenticate, requireRole('admin'), async (
 /* ── At-risk students (below 75% overall) ── */
 app.get('/api/admin/at-risk-students', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
+    const threshold = await getAttendanceThreshold();
     const [rows] = await pool.execute(`
       SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email,
         COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended,
@@ -529,9 +551,9 @@ app.get('/api/admin/at-risk-students', authenticate, requireRole('admin'), async
     `);
     const withCalc = rows.map(r => {
       const t = Number(r.total), a = Number(r.attended);
-      const calc = calcThreshold(a, t);
+      const calc = calcThreshold(a, t, threshold);
       return { ...r, percentage: calc.percentage, status: calc.status, needToAttend: calc.needToAttend };
-    }).filter(r => r.percentage < 75);
+    }).filter(r => r.percentage < threshold);
     return res.json(withCalc);
   } catch (error) { return next(error); }
 });
@@ -568,11 +590,12 @@ app.get('/api/admin/attendance-monitoring', authenticate, requireRole('admin'), 
        LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
        ${whereStr}
        GROUP BY s.student_id, s.name, s.roll_number, c.course_id, c.course_code, c.course_name
-       ORDER BY s.name, c.course_code LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY s.name, c.course_code LIMIT ${limit} OFFSET ${offset}`,
+      params
     );
+    const threshold = await getAttendanceThreshold();
     const withCalc = rows.map(r => {
-      const calc = calcThreshold(Number(r.attended), Number(r.total_sessions));
+      const calc = calcThreshold(Number(r.attended), Number(r.total_sessions), threshold);
       return { ...r, percentage: calc.percentage, status: calc.status, canMiss: calc.canMiss, needToAttend: calc.needToAttend };
     });
     return res.json({ data: withCalc, total, page, limit, pages: Math.ceil(total / limit) });
@@ -601,8 +624,8 @@ app.get('/api/admin/audit-logs', authenticate, requireRole('admin'), async (req,
        LEFT JOIN students s ON s.user_id = al.user_id
        LEFT JOIN faculty f ON f.user_id = al.user_id
        ${where}
-       ORDER BY al.created_at DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY al.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+      params
     ).catch(() => [[]]);
 
     return res.json({ data: rows, total, page, limit, pages: Math.ceil(total / limit) });
@@ -640,6 +663,7 @@ app.put('/api/admin/settings', authenticate, requireRole('admin'), async (req, r
       ).catch(() => {}); // table may not exist
     }
     auditLog(req.user.sub, 'admin', 'UPDATE_SETTINGS', null, null, req.body);
+    thresholdCache.at = 0;
     return res.json({ message: 'Settings updated.' });
   } catch (error) { return next(error); }
 });
@@ -720,14 +744,15 @@ app.post('/api/qr/scan', authenticate, requireRole('student'), async (req, res, 
 // STUDENT APIs
 // ==========================================
 /* ── Centralized calculation API ── */
-app.get('/api/calculate-attendance', authenticate, (req, res, next) => {
+app.get('/api/calculate-attendance', authenticate, async (req, res, next) => {
   try {
     let attended = parseInt(req.query.attended);
     let total = parseInt(req.query.total);
     if (isNaN(attended) || isNaN(total) || attended < 0 || total < 0 || attended > total) {
       return fail(res, 400, 'Invalid attendance parameters.');
     }
-    const result = calcThreshold(attended, total);
+    const threshold = await getAttendanceThreshold();
+    const result = calcThreshold(attended, total, threshold);
     return res.json({ attended, total, ...result });
   } catch (error) { return next(error); }
 });
@@ -737,20 +762,22 @@ app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, 
   try {
     const [rows] = await pool.execute(
       `SELECT s.student_id, s.name,
-              COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended_classes,
-              (SELECT COUNT(DISTINCT se.session_id) FROM sessions se
-               JOIN enrollments e ON e.course_id = se.course_id
-               WHERE e.student_id = s.student_id) AS total_classes
+              COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN se.session_id END) AS attended_classes,
+              COUNT(DISTINCT se.session_id) AS total_classes
        FROM students s
-       LEFT JOIN attendance_records ar ON ar.student_id = s.student_id
+       LEFT JOIN enrollments e ON e.student_id = s.student_id
+       LEFT JOIN sessions se ON se.course_id = e.course_id
+       LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
        WHERE s.user_id = ?
        GROUP BY s.student_id, s.name`,
       [req.user.sub]
     );
     const student = rows[0];
     if (!student) return fail(res, 404, 'Student profile not found.');
-    const total = Number(student.total_classes), attended = Number(student.attended_classes);
-    const overall = calcThreshold(attended, total);
+    const threshold = await getAttendanceThreshold();
+    const total = Number(student.total_classes) || 0;
+    const attended = Number(student.attended_classes) || 0;
+    const overall = calcThreshold(attended, total, threshold);
 
     const [courseRows] = await pool.execute(
       `SELECT c.course_id, c.course_code, c.course_name,
@@ -769,7 +796,7 @@ app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, 
 
     const courses = courseRows.map(c => {
       const ct = Number(c.total_classes), ca = Number(c.attended_classes);
-      const thr = calcThreshold(ca, ct);
+      const thr = calcThreshold(ca, ct, threshold);
       return {
         course_id: c.course_id, course_code: c.course_code, course_name: c.course_name,
         total: ct, attended: ca, absent: ct - ca,
@@ -786,7 +813,7 @@ app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, 
       absent_classes:   total - attended,
       percentage:       overall.percentage,
       status:           overall.status,
-      threshold:        ATTENDANCE_THRESHOLD,
+      threshold:        threshold,
       can_miss:         overall.canMiss,
       need_to_attend:   overall.needToAttend,
       courses
@@ -818,8 +845,8 @@ app.get('/api/student/attendance-history', authenticate, requireRole('student'),
        LEFT JOIN faculty f ON f.faculty_id = se.faculty_id
        WHERE s.user_id = ?
        ORDER BY se.session_date DESC, se.start_time DESC
-       LIMIT ? OFFSET ?`,
-      [req.user.sub, limit, offset]
+       LIMIT ${limit} OFFSET ${offset}`,
+      [req.user.sub]
     );
     return res.json({ data: rows, total, page, limit, pages: Math.ceil(total / limit) });
   } catch (error) { return next(error); }
@@ -1159,18 +1186,22 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
     const profile = profileRows[0];
 
     // Overall attendance
+    const threshold = await getAttendanceThreshold();
     const [[overallRow]] = await pool.execute(
       `SELECT
-         COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended,
-         (SELECT COUNT(DISTINCT se.session_id) FROM sessions se
-          JOIN enrollments e ON e.course_id = se.course_id WHERE e.student_id = ?) AS total
-       FROM attendance_records ar WHERE ar.student_id = ?`,
-      [profile.student_id, profile.student_id]
+         COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN se.session_id END) AS attended,
+         COUNT(DISTINCT se.session_id) AS total
+       FROM students s
+       LEFT JOIN enrollments e ON e.student_id = s.student_id
+       LEFT JOIN sessions se ON se.course_id = e.course_id
+       LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
+       WHERE s.student_id = ?`,
+      [profile.student_id]
     );
-    const totalClasses   = Number(overallRow.total);
-    const attendedClasses = Number(overallRow.attended);
-    const absentClasses  = totalClasses - attendedClasses;
-    const overall        = calcThreshold(attendedClasses, totalClasses);
+    const totalClasses   = Number(overallRow.total) || 0;
+    const attendedClasses = Number(overallRow.attended) || 0;
+    const absentClasses  = Math.max(0, totalClasses - attendedClasses);
+    const overall        = calcThreshold(attendedClasses, totalClasses, threshold);
 
     // Course-wise breakdown
     const [courseRows] = await pool.execute(
@@ -1189,7 +1220,7 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
 
     const coursesData = courseRows.map(c => {
       const t = Number(c.total_sessions), a = Number(c.attended_count);
-      const calc = calcThreshold(a, t);
+      const calc = calcThreshold(a, t, threshold);
       return { ...c, total: t, attended: a, absent: t - a, ...calc };
     });
 
@@ -1265,7 +1296,7 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
       { label: 'TOTAL CLASSES', value: totalClasses,    color: '#2563EB', bg: '#EFF6FF' },
       { label: 'ATTENDED',      value: attendedClasses, color: SUCCESS,   bg: '#F0FDF4' },
       { label: 'ABSENT',        value: absentClasses,   color: DANGER,    bg: '#FEF2F2' },
-      { label: 'ATTENDANCE %',  value: totalClasses === 0 ? '—' : overall.percentage + '%', color: overall.percentage >= 75 ? SUCCESS : DANGER, bg: overall.percentage >= 75 ? '#F0FDF4' : '#FEF2F2' },
+      { label: 'ATTENDANCE %',  value: totalClasses === 0 ? '—' : overall.percentage + '%', color: overall.percentage >= threshold ? SUCCESS : DANGER, bg: overall.percentage >= threshold ? '#F0FDF4' : '#FEF2F2' },
     ];
     y += 8;
     statData.forEach((s, i) => {
@@ -1294,7 +1325,7 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
       // Status row
       doc.rect(50, y, PAGE_W, 32).fill(BG_LIGHT).stroke(BORDER);
       doc.fontSize(8).font('Helvetica').fillColor(SLATE).text('Required Threshold:', 62, y + 6);
-      doc.fontSize(8).font('Helvetica-Bold').fillColor(NAVY).text('75%', 180, y + 6);
+      doc.fontSize(8).font('Helvetica-Bold').fillColor(NAVY).text(threshold + '%', 180, y + 6);
       doc.fontSize(8).font('Helvetica').fillColor(SLATE).text('Current Attendance:', 62, y + 18);
       doc.fontSize(8).font('Helvetica-Bold').fillColor(statusColor).text(overall.percentage + '%', 180, y + 18);
       doc.fontSize(8).font('Helvetica').fillColor(SLATE).text('Status:', 280, y + 6);
@@ -1308,9 +1339,9 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
       const fillW = Math.min(barW, (overall.percentage / 100) * barW);
       doc.rect(50, y, fillW, barH).fill(statusColor);
       // Threshold marker
-      const markerX = 50 + (75 / 100) * barW;
+      const markerX = 50 + (threshold / 100) * barW;
       doc.moveTo(markerX, y - 4).lineTo(markerX, y + barH + 4).strokeColor(NAVY).lineWidth(1.5).stroke();
-      doc.fontSize(7).font('Helvetica-Bold').fillColor(NAVY).text('75%', markerX - 10, y + barH + 6);
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(NAVY).text(threshold + '%', markerX - 10, y + barH + 6);
       doc.fontSize(7).font('Helvetica').fillColor(LIGHT).text('0%', 50, y + barH + 6);
       doc.fontSize(7).font('Helvetica').fillColor(LIGHT).text('100%', 50 + barW - 22, y + barH + 6);
       y += barH + 22;
@@ -1320,11 +1351,11 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
       const msgBdr = overall.status === 'safe' ? '#BBF7D0' : overall.status === 'near_threshold' ? '#FDE68A' : '#FECACA';
       let msgText;
       if (overall.status === 'safe')
-        msgText = `Your attendance is above the required threshold. You can afford to miss up to ${overall.canMiss} more class${overall.canMiss === 1 ? '' : 'es'} while staying above 75%.`;
+        msgText = `Your attendance is above the required threshold. You can afford to miss up to ${overall.canMiss} more class${overall.canMiss === 1 ? '' : 'es'} while staying above ${threshold}%.`;
       else if (overall.status === 'near_threshold')
-        msgText = `Your attendance is just above 75%. You can miss at most ${overall.canMiss} more class${overall.canMiss === 1 ? '' : 'es'}. Stay cautious.`;
+        msgText = `Your attendance is just above ${threshold}%. You can miss at most ${overall.canMiss} more class${overall.canMiss === 1 ? '' : 'es'}. Stay cautious.`;
       else
-        msgText = `Your attendance is below the required threshold. You must attend ${overall.needToAttend} consecutive class${overall.needToAttend === 1 ? '' : 'es'} to reach 75%.`;
+        msgText = `Your attendance is below the required threshold. You must attend ${overall.needToAttend} consecutive class${overall.needToAttend === 1 ? '' : 'es'} to reach ${threshold}%.`;
 
       doc.rect(50, y, PAGE_W, 30).fill(msgBg).stroke(msgBdr);
       doc.fontSize(8).font('Helvetica').fillColor('#1A2332').text(msgText, 62, y + 9, { width: PAGE_W - 24 });
@@ -1375,7 +1406,7 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
           y = drawTableHeader(y);
         }
         if (i % 2 === 0) doc.rect(50, y, PAGE_W, rowH).fill(BG_LIGHT);
-        const pctColor = c.percentage >= 75 ? SUCCESS : DANGER;
+        const pctColor = c.percentage >= threshold ? SUCCESS : DANGER;
         const statusLabel = { safe: 'Safe', near_threshold: 'Near Threshold', at_risk: 'At Risk', critical: 'Critical', no_classes: 'No Data' }[c.status] || c.status;
         let cx = 54;
         const cells = [

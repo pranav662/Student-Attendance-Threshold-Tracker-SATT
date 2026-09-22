@@ -21,10 +21,14 @@
   <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-head">
-      <div class="sidebar-logo" style="border-radius:999px;">S</div>
-      <div>
-        <div class="sidebar-title">SATT</div>
-        <span class="sidebar-role" style="white-space:normal;line-height:1.2;font-size:0.6rem;">Student Attendance<br>Threshold Tracker</span>
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg>
+        </div>
+        <div class="brand-copy">
+          <div class="sidebar-title">SATT</div>
+          <span class="sidebar-role">Attendance Tracker</span>
+        </div>
       </div>
     </div>
 
@@ -166,7 +170,7 @@
               </div>
               <div class="threshold-row">
                 <span class="threshold-label">Minimum Required</span>
-                <span class="threshold-value muted">75%</span>
+                <span class="threshold-value muted" id="thrMinRequired">75%</span>
               </div>
               <div class="threshold-row">
                 <span class="threshold-label">Status</span>
@@ -176,11 +180,11 @@
             <div class="threshold-bar-wrap" style="margin-top:0.875rem;">
               <div class="threshold-bar-track">
                 <div class="threshold-bar-fill" id="thrBarFill" style="width:0%"></div>
-                <div class="threshold-marker" style="left:75%;" title="75% threshold"></div>
+                <div class="threshold-marker" id="thrMarker" style="left:75%;" title="75% threshold"></div>
               </div>
               <div class="threshold-bar-labels">
                 <span>0%</span>
-                <span style="color:var(--text-2);font-weight:600;">75%</span>
+                <span style="color:var(--text-2);font-weight:600;" id="thrMarkerLabel">75%</span>
                 <span>100%</span>
               </div>
             </div>
@@ -263,9 +267,9 @@
             <div class="threshold-bar-wrap" style="margin-top:1rem;">
               <div class="threshold-bar-track">
                 <div class="threshold-bar-fill" id="thrBarFill2" style="width:0%"></div>
-                <div class="threshold-marker" style="left:75%;"></div>
+                <div class="threshold-marker" id="thrMarker2" style="left:75%;"></div>
               </div>
-              <div class="threshold-bar-labels"><span>0%</span><span>75%</span><span>100%</span></div>
+              <div class="threshold-bar-labels"><span>0%</span><span id="thrMarkerLabel2">75%</span><span>100%</span></div>
             </div>
           </div>
 
@@ -548,11 +552,14 @@
       const data = await res.json();
       attendanceData = data;
 
-      const attended = data.attended_classes || 0;
-      const total    = data.total_classes    || 0;
-      const absent   = data.absent_classes   || 0;
-      const pct      = data.percentage       || 0;
-      const courses  = data.courses          || [];
+      const attended = Number(data.attended_classes) || 0;
+      const total    = Number(data.total_classes)    || 0;
+      const absent   = Number.isFinite(Number(data.absent_classes))
+        ? Number(data.absent_classes)
+        : Math.max(0, total - attended);
+      const pct      = Number(data.percentage);
+      const courses  = Array.isArray(data.courses) ? data.courses : [];
+      applyThresholdLabels(Number(data.threshold) || 75);
 
       /* Stat cards */
       function setStat(id, val) {
@@ -565,7 +572,7 @@
       setStat('statCourses',  courses.length);
 
       /* Ring */
-      updateRing(pct, data.status);
+      updateRing(Number.isFinite(pct) ? pct : 0, data.status);
 
       /* Threshold summary on overview */
       updateThresholdOverview(data);
@@ -584,10 +591,30 @@
     }
   }
 
+  function currentThreshold() {
+    const t = Number(attendanceData && attendanceData.threshold);
+    return Number.isFinite(t) && t > 0 ? t : 75;
+  }
+
+  function applyThresholdLabels(threshold) {
+    const pct = threshold + '%';
+    const left = Math.min(100, Math.max(0, threshold)) + '%';
+    const minReq = document.getElementById('thrMinRequired');
+    const marker = document.getElementById('thrMarker');
+    const label  = document.getElementById('thrMarkerLabel');
+    const marker2 = document.getElementById('thrMarker2');
+    const label2  = document.getElementById('thrMarkerLabel2');
+    if (minReq) minReq.textContent = pct;
+    if (marker) { marker.style.left = left; marker.title = pct + ' threshold'; }
+    if (label) label.textContent = pct;
+    if (marker2) marker2.style.left = left;
+    if (label2) label2.textContent = pct;
+  }
+
   /* ── Attendance ring ── */
   function updateRing(pct, status) {
     const CIRC = 2 * Math.PI * 64; // 402.12
-    const offset = CIRC * (1 - pct / 100);
+    const offset = CIRC * (1 - Math.min(100, Math.max(0, pct)) / 100);
     const arc = document.getElementById('ringArc');
     arc.style.strokeDashoffset = offset;
     arc.className = 'ring-fill ' + getRingClass(pct);
@@ -600,8 +627,9 @@
   }
 
   function getRingClass(pct) {
-    if (pct >= 85) return 'ring-safe';
-    if (pct >= 75) return 'ring-warn';
+    const threshold = currentThreshold();
+    if (pct >= Math.min(100, threshold + 10)) return 'ring-safe';
+    if (pct >= threshold) return 'ring-warn';
     return 'ring-danger';
   }
 
@@ -618,8 +646,9 @@
 
   /* ── Threshold overview panel ── */
   function updateThresholdOverview(data) {
-    const pct  = data.percentage || 0;
+    const pct  = Number(data.percentage) || 0;
     const stat = data.status || 'no_classes';
+    applyThresholdLabels(Number(data.threshold) || currentThreshold());
 
     document.getElementById('thrCurrent').textContent = pct + '%';
 
@@ -646,8 +675,9 @@
   }
 
   function getBarClass(pct) {
-    if (pct >= 85) return 'bar-safe';
-    if (pct >= 75) return 'bar-warn';
+    const threshold = currentThreshold();
+    if (pct >= Math.min(100, threshold + 10)) return 'bar-safe';
+    if (pct >= threshold) return 'bar-warn';
     return 'bar-danger';
   }
 
@@ -658,15 +688,18 @@
   }
 
   function buildMessage(data) {
-    const { status, can_miss, need_to_attend, percentage } = data;
+    const threshold = Number(data.threshold) || currentThreshold();
+    const can_miss = Number(data.can_miss ?? data.canMiss) || 0;
+    const need_to_attend = Number(data.need_to_attend ?? data.needToAttend) || 0;
+    const { status, percentage } = data;
     if (status === 'safe')
-      return `You are safe. You can afford to miss up to ${can_miss} more class${can_miss === 1 ? '' : 'es'} and stay above 75%.`;
+      return `You are safe. You can afford to miss up to ${can_miss} more class${can_miss === 1 ? '' : 'es'} and stay above ${threshold}%.`;
     if (status === 'near_threshold')
       return `You are at ${percentage}% — just above threshold. You can miss at most ${can_miss} more class${can_miss === 1 ? '' : 'es'}.`;
     if (status === 'at_risk')
-      return `You are below 75%. You must attend ${need_to_attend} more consecutive class${need_to_attend === 1 ? '' : 'es'} to reach 75%.`;
+      return `You are below ${threshold}%. You must attend ${need_to_attend} more consecutive class${need_to_attend === 1 ? '' : 'es'} to reach ${threshold}%.`;
     if (status === 'critical')
-      return `Critical: ${percentage}% attendance. You must attend ${need_to_attend} consecutive classes to recover to 75%.`;
+      return `Critical: ${percentage}% attendance. You must attend ${need_to_attend} consecutive classes to recover to ${threshold}%.`;
     return 'No attendance data recorded yet for this semester.';
   }
 
@@ -680,9 +713,10 @@
     // Show first 4 courses as compact rows
     const shown = courses.slice(0, 4);
     container.innerHTML = shown.map(c => {
-      const pct = c.percentage || 0;
-      const colorVar = pct >= 85 ? 'var(--success)' : pct >= 75 ? 'var(--warning)' : 'var(--danger)';
-      const barClass = pct >= 85 ? 'safe' : pct >= 75 ? 'warn' : 'danger';
+      const pct = Number(c.percentage) || 0;
+      const threshold = currentThreshold();
+      const colorVar = pct >= Math.min(100, threshold + 10) ? 'var(--success)' : pct >= threshold ? 'var(--warning)' : 'var(--danger)';
+      const barClass = pct >= Math.min(100, threshold + 10) ? 'safe' : pct >= threshold ? 'warn' : 'danger';
       return `
         <div style="padding:0.5rem 0;border-bottom:1px solid var(--border-light);">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;margin-bottom:4px;">
@@ -708,8 +742,9 @@
       return;
     }
     tbody.innerHTML = courses.map(c => {
-      const pct = c.percentage || 0;
-      const barClass = pct >= 85 ? 'safe' : pct >= 75 ? 'warn' : 'danger';
+      const pct = Number(c.percentage) || 0;
+      const threshold = currentThreshold();
+      const barClass = pct >= Math.min(100, threshold + 10) ? 'safe' : pct >= threshold ? 'warn' : 'danger';
       const statMap = {
         safe:           ['Safe',            'badge-safe'],
         near_threshold: ['Near Threshold',  'badge-warn'],
@@ -746,13 +781,16 @@
 
   /* ── Threshold detail section ── */
   function renderThresholdSection(data) {
-    const pct      = data.percentage || 0;
-    const attended = data.attended_classes || 0;
-    const total    = data.total_classes    || 0;
-    const absent   = data.absent_classes   || 0;
+    const pct      = Number(data.percentage) || 0;
+    const attended = Number(data.attended_classes) || 0;
+    const total    = Number(data.total_classes)    || 0;
+    const absent   = Number.isFinite(Number(data.absent_classes))
+      ? Number(data.absent_classes)
+      : Math.max(0, total - attended);
     const stat     = data.status           || 'no_classes';
-    const canMiss  = data.can_miss         || 0;
-    const needAtt  = data.need_to_attend   || 0;
+    const canMiss  = Number(data.can_miss ?? data.canMiss) || 0;
+    const needAtt  = Number(data.need_to_attend ?? data.needToAttend) || 0;
+    applyThresholdLabels(Number(data.threshold) || currentThreshold());
 
     document.getElementById('thrBigPct').textContent = pct + '%';
     document.getElementById('thrBigSub').textContent =
@@ -798,62 +836,72 @@
   }
 
   /* ── What-if calculator ── */
+  let whatIfBound = false;
   function initWhatIf(data) {
-    document.getElementById('wifBase').value  = data.attended_classes || 0;
-    document.getElementById('wifTotal').value = data.total_classes    || 0;
-    ['wifBase','wifTotal','wifAttendMore','wifMissMore'].forEach(id => {
-      document.getElementById(id)?.addEventListener('input', calcWhatIf);
-    });
+    document.getElementById('wifBase').value  = Number(data.attended_classes) || 0;
+    document.getElementById('wifTotal').value = Number(data.total_classes)    || 0;
+    if (!whatIfBound) {
+      ['wifBase','wifTotal','wifAttendMore','wifMissMore'].forEach(id => {
+        document.getElementById(id)?.addEventListener('input', calcWhatIf);
+      });
+      whatIfBound = true;
+    }
     calcWhatIf();
   }
 
-  let whatIfTimeout = null;
-  async function calcWhatIf() {
-    if (whatIfTimeout) clearTimeout(whatIfTimeout);
-    whatIfTimeout = setTimeout(async () => {
-      const base    = parseInt(document.getElementById('wifBase').value)      || 0;
-      const total   = parseInt(document.getElementById('wifTotal').value)     || 0;
-      const more    = parseInt(document.getElementById('wifAttendMore').value) || 0;
-      const miss    = parseInt(document.getElementById('wifMissMore').value)   || 0;
+  function calcWhatIf() {
+    const base    = Math.max(0, parseInt(document.getElementById('wifBase').value, 10) || 0);
+    const total   = Math.max(0, parseInt(document.getElementById('wifTotal').value, 10) || 0);
+    const more    = Math.max(0, parseInt(document.getElementById('wifAttendMore').value, 10) || 0);
+    const miss    = Math.max(0, parseInt(document.getElementById('wifMissMore').value, 10) || 0);
+    const threshold = currentThreshold();
 
-      const newAtt  = base + more;
-      const newTot  = total + more + miss;
+    const resultPct    = document.getElementById('calcResultPct');
+    const resultDetail = document.getElementById('calcResultDetail');
+    const resultBadge  = document.getElementById('calcResultBadge');
+    const detailsContainer = resultDetail.parentElement;
 
-      try {
-        const res = await SAMS.apiFetch(`/api/calculate-attendance?attended=${newAtt}&total=${newTot}`);
-        if (!res.ok) return;
-        const data = await res.json();
+    let existingNeeds = document.getElementById('calcNeedsText');
+    if (!existingNeeds) {
+      existingNeeds = document.createElement('div');
+      existingNeeds.id = 'calcNeedsText';
+      existingNeeds.style.fontSize = '0.75rem';
+      existingNeeds.style.color = 'var(--text-3)';
+      existingNeeds.style.marginTop = '0.25rem';
+      detailsContainer.appendChild(existingNeeds);
+    }
 
-        const resultPct    = document.getElementById('calcResultPct');
-        const resultDetail = document.getElementById('calcResultDetail');
-        const resultBadge  = document.getElementById('calcResultBadge');
+    if (base > total) {
+      resultPct.textContent = '—';
+      resultPct.style.color = 'var(--danger)';
+      resultDetail.textContent = 'Attended cannot exceed classes conducted.';
+      resultBadge.textContent = 'Invalid';
+      resultBadge.className = 'badge badge-danger';
+      existingNeeds.textContent = '';
+      return;
+    }
 
-        resultPct.textContent = data.percentage + '%';
-        resultDetail.textContent =
-          `${data.attended} attended / ${data.total} conducted${data.total !== total ? ' (projected)' : ''}`;
+    const data = SAMS.calcThreshold(base + more, total + more + miss, threshold);
+    const above = data.percentage >= threshold;
 
-        const safe = data.status === 'Safe';
-        resultBadge.textContent = safe ? 'Above Threshold' : 'Below Threshold';
-        resultBadge.className   = safe ? 'badge badge-safe' : 'badge badge-danger';
-        resultPct.style.color   = data.percentage >= 85 ? 'var(--success)' : data.percentage >= 75 ? 'var(--warning)' : 'var(--danger)';
-        
-        const detailsContainer = document.getElementById('calcResultDetail').parentElement;
-        let needsText = data.canMiss > 0 ? `Can miss ${data.canMiss} more` : 
-                        data.needToAttend > 0 ? `Must attend next ${data.needToAttend}` : 
-                        'On the edge';
-        
-        let existingNeeds = document.getElementById('calcNeedsText');
-        if (!existingNeeds) {
-          existingNeeds = document.createElement('div');
-          existingNeeds.id = 'calcNeedsText';
-          existingNeeds.style.fontSize = '0.75rem';
-          existingNeeds.style.color = 'var(--text-3)';
-          existingNeeds.style.marginTop = '0.25rem';
-          detailsContainer.appendChild(existingNeeds);
-        }
-        existingNeeds.textContent = needsText;
-      } catch (e) { console.error('What-If error:', e); }
-    }, 150);
+    resultPct.textContent = data.percentage + '%';
+    resultDetail.textContent =
+      `${data.attended} attended / ${data.total} conducted${data.total !== total ? ' (projected)' : ''}`;
+    resultBadge.textContent = data.status === 'no_classes'
+      ? 'No Data'
+      : (above ? 'Above Threshold' : 'Below Threshold');
+    resultBadge.className = data.status === 'no_classes'
+      ? 'badge badge-muted'
+      : (above ? 'badge badge-safe' : 'badge badge-danger');
+    resultPct.style.color = data.percentage >= Math.min(100, threshold + 10)
+      ? 'var(--success)'
+      : data.percentage >= threshold ? 'var(--warning)' : 'var(--danger)';
+
+    existingNeeds.textContent = data.canMiss > 0
+      ? `Can miss ${data.canMiss} more while staying at ${threshold}%`
+      : data.needToAttend > 0
+        ? `Must attend the next ${data.needToAttend} to reach ${threshold}%`
+        : (data.status === 'no_classes' ? '' : 'On the threshold');
   }
   window.calcWhatIf = calcWhatIf;
 
