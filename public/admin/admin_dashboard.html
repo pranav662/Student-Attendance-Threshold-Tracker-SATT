@@ -723,7 +723,7 @@
 (function () {
   'use strict';
   SAMS.initTheme();
-  SAMS.requireAuth();
+  if (!SAMS.requireAuth()) return;
 
   // ── Role guard ──
   const decoded = SAMS.getToken() ? (() => { try { return JSON.parse(atob(SAMS.getToken().split('.')[1])); } catch { return {}; } })() : {};

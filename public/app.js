@@ -75,14 +75,20 @@
             toast('Network error — check your connection.', 'error');
             throw err;
         }
+        if (!res.ok) {
+            console.error(`API Error: ${options.method || 'GET'} ${url} returned ${res.status} ${res.statusText}`);
+        }
         if (res.status === 401) {
-            toast('Session expired. Signing you out…', 'error');
+            toast(`Session expired (${res.status}). Signing you out…`, 'error');
             setTimeout(() => logout(), 1200);
             throw new Error('unauthorized');
         }
         if (res.status === 403) {
-            toast('Access denied.', 'error');
+            toast(`Access denied (${res.status}).`, 'error');
             throw new Error('forbidden');
+        }
+        if (!res.ok && res.status >= 500) {
+            toast(`Server error (${res.status}). Please try again later.`, 'error');
         }
         return res;
     }

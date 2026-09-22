@@ -380,7 +380,7 @@
 (function () {
   'use strict';
   SAMS.initTheme();
-  SAMS.requireAuth();
+  if (!SAMS.requireAuth()) return;
 
   const SECTIONS = ['live','manual','courses','sessions','assign'];
   const TITLES   = { live:'Live Session', manual:'Mark Attendance', courses:'My Courses', sessions:'Past Sessions', assign:'Assign Course' };

@@ -469,7 +469,7 @@
 (function () {
   'use strict';
   SAMS.initTheme();
-  SAMS.requireAuth();
+  if (!SAMS.requireAuth()) return;
 
   /* ── Section map ── */
   const SECTIONS = ['overview','courses','history','threshold','scan','enroll'];
@@ -617,7 +617,7 @@
     const offset = CIRC * (1 - Math.min(100, Math.max(0, pct)) / 100);
     const arc = document.getElementById('ringArc');
     arc.style.strokeDashoffset = offset;
-    arc.className = 'ring-fill ' + getRingClass(pct);
+    arc.setAttribute('class', 'ring-fill ' + getRingClass(pct));
     document.getElementById('ringPct').textContent = pct + '%';
 
     const statusEl = document.getElementById('ringStatus');
