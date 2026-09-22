@@ -930,22 +930,124 @@ app.post('/api/faculty/assign-course', authenticate, requireRole('faculty'), asy
 app.get('/api/faculty/students', authenticate, requireRole('faculty'), async (req, res, next) => {
   try {
     const courseId = parseInt(req.query.course_id);
-    if (!courseId) return fail(res, 400, 'Course ID required.');
+    const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+
+    if (courseId) {
+      const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+      if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
+      const [students] = await pool.execute(
+        `SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email, c.course_id, c.course_code, c.course_name,
+         (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ar.status = 'Present') as present_count,
+         (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = e.course_id) as total_sessions
+         FROM students s
+         JOIN users u ON s.user_id = u.user_id
+         JOIN enrollments e ON s.student_id = e.student_id
+         JOIN courses c ON e.course_id = c.course_id
+         WHERE e.course_id = ? ORDER BY s.name`,
+        [courseId]
+      );
+      return res.json(students);
+    } else {
+      const [students] = await pool.execute(
+        `SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email, c.course_id, c.course_code, c.course_name,
+         (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ar.status = 'Present') as present_count,
+         (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = e.course_id) as total_sessions
+         FROM students s
+         JOIN users u ON s.user_id = u.user_id
+         JOIN enrollments e ON s.student_id = e.student_id
+         JOIN courses c ON e.course_id = c.course_id
+         JOIN faculty_assignments fa ON c.course_id = fa.course_id
+         WHERE fa.faculty_id = ? ORDER BY s.name, c.course_code`,
+        [facultyId]
+      );
+      return res.json(students);
+    }
+  } catch (error) { return next(error); }
+});
+
+app.get('/api/faculty/students/:id/details', authenticate, requireRole('faculty'), async (req, res, next) => {
+  try {
+    const studentId = parseInt(req.params.id);
+    const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculties[0].faculty_id;
+
+    // Verify faculty teaches the student in at least one course
+    const [authCheck] = await pool.execute(
+      `SELECT 1 FROM enrollments e
+       JOIN faculty_assignments fa ON e.course_id = fa.course_id
+       WHERE e.student_id = ? AND fa.faculty_id = ? LIMIT 1`,
+      [studentId, facultyId]
+    );
+    if (!authCheck.length) return fail(res, 403, 'Unauthorized. Student is not in any of your courses.');
+
+    const [info] = await pool.execute(
+      `SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email
+       FROM students s JOIN users u ON s.user_id = u.user_id WHERE s.student_id = ?`,
+      [studentId]
+    );
+    if (!info[0]) return fail(res, 404, 'Student not found.');
+
+    const [courses] = await pool.execute(
+      `SELECT c.course_id, c.course_code, c.course_name,
+       (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = ? AND ss.course_id = c.course_id AND ar.status = 'Present') as present_count,
+       (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = c.course_id) as total_sessions
+       FROM courses c
+       JOIN enrollments e ON c.course_id = e.course_id
+       JOIN faculty_assignments fa ON c.course_id = fa.course_id
+       WHERE e.student_id = ? AND fa.faculty_id = ?`,
+      [studentId, studentId, facultyId]
+    );
+
+    const [history] = await pool.execute(
+      `SELECT ss.session_id, ss.session_date, ss.start_time, c.course_code, ar.status, ar.marked_at, ar.record_id
+       FROM attendance_records ar
+       JOIN sessions ss ON ar.session_id = ss.session_id
+       JOIN courses c ON ss.course_id = c.course_id
+       JOIN faculty_assignments fa ON c.course_id = fa.course_id
+       WHERE ar.student_id = ? AND fa.faculty_id = ?
+       ORDER BY ss.session_date DESC, ss.start_time DESC LIMIT 20`,
+      [studentId, facultyId]
+    );
+
+    return res.json({ student: info[0], courses, history });
+  } catch (error) { return next(error); }
+});
+
+app.put('/api/faculty/students/:id', authenticate, requireRole('faculty'), async (req, res, next) => {
+  try {
+    const studentId = parseInt(req.params.id);
+    const { name, roll_number, batch_year } = req.body;
+    
+    if (!name || !roll_number || !batch_year) return fail(res, 400, 'Name, roll_number, and batch_year are required.');
 
     const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
     if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
     const facultyId = faculties[0].faculty_id;
 
-    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
-    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
-
-    const [students] = await pool.execute(
-      `SELECT s.student_id, s.name, s.roll_number
-       FROM students s JOIN enrollments e ON s.student_id = e.student_id
-       WHERE e.course_id = ? ORDER BY s.name`,
-      [courseId]
+    // Verify faculty teaches the student
+    const [authCheck] = await pool.execute(
+      `SELECT 1 FROM enrollments e
+       JOIN faculty_assignments fa ON e.course_id = fa.course_id
+       WHERE e.student_id = ? AND fa.faculty_id = ? LIMIT 1`,
+      [studentId, facultyId]
     );
-    return res.json(students);
+    if (!authCheck.length) return fail(res, 403, 'Unauthorized to edit this student.');
+
+    // Check duplicate roll number
+    const [dup] = await pool.execute('SELECT student_id FROM students WHERE roll_number = ? AND student_id != ?', [roll_number, studentId]);
+    if (dup.length) return fail(res, 400, 'Roll number already exists.');
+
+    await pool.execute(
+      'UPDATE students SET name = ?, roll_number = ?, batch_year = ? WHERE student_id = ?',
+      [name, roll_number, batch_year, studentId]
+    );
+    
+    auditLog(req.user.sub, 'faculty', 'UPDATE_STUDENT', 'student', studentId, { name, roll_number, batch_year });
+    return res.json({ message: 'Student updated successfully.' });
   } catch (error) { return next(error); }
 });
 
@@ -1039,7 +1141,7 @@ app.put('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
   const connection = await pool.getConnection();
   try {
     const sessionId = parseInt(req.params.session_id);
-    const { records } = req.body;
+    const { records, reason } = req.body;
     if (!records || !Array.isArray(records)) return fail(res, 400, 'Invalid data format.');
 
     const [faculties] = await connection.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
@@ -1061,10 +1163,29 @@ app.put('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
       if (!enroll.length) continue;
 
       const status = record.status === 'Absent' ? 'Absent' : 'Present';
+      
+      // Fetch old status if reason is provided
+      let oldStatus = null;
+      if (reason) {
+        const [oldRec] = await connection.execute('SELECT status FROM attendance_records WHERE session_id = ? AND student_id = ?', [sessionId, record.student_id]);
+        if (oldRec.length) oldStatus = oldRec[0].status;
+      }
+      
       await connection.execute(
         'UPDATE attendance_records SET status = ? WHERE session_id = ? AND student_id = ?',
         [status, sessionId, record.student_id]
       );
+      
+      if (reason && oldStatus !== status) {
+        auditLog(req.user.sub, 'faculty', 'CORRECT_ATTENDANCE', 'attendance', record.student_id, {
+          session_id: sessionId,
+          course_id: courseId,
+          student_id: record.student_id,
+          old_status: oldStatus,
+          new_status: status,
+          reason
+        });
+      }
     }
     await connection.commit();
     return res.json({ message: 'Attendance updated successfully.' });

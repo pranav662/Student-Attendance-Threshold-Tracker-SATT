@@ -7,6 +7,7 @@
   <meta name="description" content="Faculty attendance management dashboard — generate QR tokens, mark attendance, and manage courses.">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     (function() {
       var saved = localStorage.getItem('sams_theme');
@@ -88,6 +89,9 @@
       <div class="nav-group-label">Courses</div>
       <button class="nav-item" data-section="courses" onclick="gotoSection('courses',this)">
         <i data-lucide="book-open"></i><span>My Courses</span>
+      </button>
+      <button class="nav-item" data-section="students" onclick="gotoSection('students',this)">
+        <i data-lucide="users"></i><span>Students</span>
       </button>
       <button class="nav-item" data-section="sessions" onclick="gotoSection('sessions',this)">
         <i data-lucide="history"></i><span>Past Sessions</span>
@@ -195,7 +199,7 @@
 
             <!-- QR code container -->
             <div class="qr-wrap" id="qrContainer" style="margin-top:1rem;min-height:180px;justify-content:center;">
-              <div id="qrCode" style="display:flex;align-items:center;justify-content:center;width:160px;height:160px;background:var(--bg-hover);border-radius:var(--r-md);color:var(--text-3);font-size:0.8125rem;">Generating…</div>
+              <div id="qrCode" style="display:flex;align-items:center;justify-content:center;background:#fff;padding:1rem;border-radius:var(--r-md);box-shadow:var(--shadow-sm);">Generating…</div>
             </div>
 
             <div class="token-meta" style="margin-top:0.875rem;">
@@ -260,6 +264,55 @@
               <span style="font-size:0.8125rem;color:var(--text-3);" id="submitNote">Saving will create a new session record.</span>
             </div>
             <div id="manNotice" class="notice"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ STUDENTS MANAGEMENT ═════════════════════════════== -->
+      <div id="section-students" style="display:none;">
+        <div class="page-head">
+          <div class="eyebrow">Academic</div>
+          <h1>Students</h1>
+          <p>View and manage students in your assigned courses.</p>
+        </div>
+
+        <div style="max-width:1000px;">
+          <div class="card" style="margin-bottom:1rem;padding:1.25rem;">
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;">
+              <div class="form-group" style="margin-bottom:0;flex:1;min-width:200px;">
+                <label class="form-label" for="stuFilterCourse">Filter by Course</label>
+                <select class="form-select" id="stuFilterCourse" onchange="loadStudentsTab()">
+                  <option value="">All Assigned Courses</option>
+                </select>
+              </div>
+              <div class="search-wrap" style="flex:2;min-width:250px;">
+                <i data-lucide="search"></i>
+                <input class="form-input att-search-input" type="text" id="stuSearchInput"
+                  placeholder="Search by name or roll number…"
+                  oninput="filterStudentsTab(this.value)" style="width:100%;padding-left:2rem;">
+              </div>
+              <button class="btn btn-ghost" onclick="loadStudentsTab()"><i data-lucide="refresh-cw"></i></button>
+            </div>
+          </div>
+
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div class="data-table-wrap">
+              <table class="data-table" id="studentsTable">
+                <thead>
+                  <tr>
+                    <th>Roll Number</th>
+                    <th>Name</th>
+                    <th>Batch</th>
+                    <th>Course</th>
+                    <th>Attendance</th>
+                    <th style="text-align:right;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="studentsTbody">
+                  <tr><td colspan="6" style="text-align:center;padding:2rem;">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -375,6 +428,104 @@
   </div><!-- /.main -->
 </div><!-- /.app-shell -->
 
+<!-- ══ MODALS ═══════════════════════════════════════════════== -->
+<!-- Student Details Modal -->
+<div class="modal" id="modalStudentDetails">
+  <div class="modal-content" style="max-width:600px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Student Details</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeStudentDetails()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">
+        <div>
+          <h3 id="dtlName" style="margin:0;font-size:1.5rem;">Loading…</h3>
+          <p id="dtlRoll" style="margin:0;color:var(--text-3);font-family:var(--font-mono);">—</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openEditStudent()"><i data-lucide="edit-2"></i> Edit Student</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+        <div class="card" style="padding:1rem;">
+          <div style="font-size:0.75rem;color:var(--text-3);margin-bottom:0.25rem;">Batch Year</div>
+          <div id="dtlBatch" style="font-weight:600;">—</div>
+        </div>
+        <div class="card" style="padding:1rem;">
+          <div style="font-size:0.75rem;color:var(--text-3);margin-bottom:0.25rem;">Email</div>
+          <div id="dtlEmail" style="font-weight:600;">—</div>
+        </div>
+      </div>
+      
+      <h4 style="margin:1rem 0 0.5rem;font-size:1rem;">Course Attendance</h4>
+      <div class="card" style="padding:0 1rem;margin-bottom:1.5rem;" id="dtlCourses">
+        <div style="padding:1rem;text-align:center;color:var(--text-3);">Loading…</div>
+      </div>
+
+      <h4 style="margin:1rem 0 0.5rem;font-size:1rem;">Recent Sessions</h4>
+      <div class="card" style="padding:0 1rem;" id="dtlHistory">
+        <div style="padding:1rem;text-align:center;color:var(--text-3);">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Student Modal -->
+<div class="modal" id="modalEditStudent">
+  <div class="modal-content" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Edit Student</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditStudent()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <form onsubmit="saveStudentEdit(event)">
+        <div class="form-group">
+          <label class="form-label" for="editStuName">Name</label>
+          <input type="text" id="editStuName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editStuRoll">Roll Number</label>
+          <input type="text" id="editStuRoll" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editStuBatch">Batch Year</label>
+          <input type="number" id="editStuBatch" class="form-input" required min="2000" max="2100">
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+          <button type="button" class="btn btn-ghost" onclick="closeEditStudent()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveEditBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Correct Attendance Modal -->
+<div class="modal" id="modalCorrectAtt">
+  <div class="modal-content" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 class="modal-title">Correct Attendance</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeCorrectModal()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body">
+      <form onsubmit="saveCorrectAtt(event)">
+        <div class="form-group">
+          <label class="form-label" for="corrStatus">Status</label>
+          <select id="corrStatus" class="form-select" required>
+            <option value="Present">Present</option>
+            <option value="Absent">Absent</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="corrReason">Reason for Correction</label>
+          <textarea id="corrReason" class="form-input" rows="3" placeholder="e.g. Manual error, valid medical excuse..." required></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+          <button type="button" class="btn btn-ghost" onclick="closeCorrectModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveCorrBtn">Save Correction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 <script src="/app.js"></script>
 <script>
 (function () {
@@ -382,8 +533,8 @@
   SAMS.initTheme();
   if (!SAMS.requireAuth()) return;
 
-  const SECTIONS = ['live','manual','courses','sessions','assign'];
-  const TITLES   = { live:'Live Session', manual:'Mark Attendance', courses:'My Courses', sessions:'Past Sessions', assign:'Assign Course' };
+  const SECTIONS = ['live','manual','courses','students','sessions','assign'];
+  const TITLES   = { live:'Live Session', manual:'Mark Attendance', courses:'My Courses', students:'Students', sessions:'Past Sessions', assign:'Assign Course' };
   let studentData = [];
   let sessionStudentData = [];
   let currentSessionId = null;
@@ -405,6 +556,7 @@
     closeSidebar();
     if (name === 'courses') loadMyCourses();
     if (name === 'assign')  loadAssignableCourses();
+    if (name === 'students') loadStudentsTab();
   }
   window.gotoSection = gotoSection;
 
@@ -426,6 +578,174 @@
       if (data.profile_pic) document.getElementById('sidebarAv').innerHTML = `<img src="${data.profile_pic}" alt="Avatar">`;
     } catch {}
   }
+
+  /* ── Load students tab ── */
+  let allStudentsTab = [];
+  async function loadStudentsTab() {
+    const course_id = document.getElementById('stuFilterCourse').value;
+    const tbody = document.getElementById('studentsTbody');
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;">Loading…</td></tr>`;
+    try {
+      const res = await SAMS.apiFetch(`/api/faculty/students${course_id ? '?course_id='+course_id : ''}`);
+      const data = await res.json();
+      allStudentsTab = Array.isArray(data) ? data : [];
+      filterStudentsTab(document.getElementById('stuSearchInput').value);
+    } catch {
+      SAMS.toast('Failed to load students', 'error');
+    }
+  }
+  window.loadStudentsTab = loadStudentsTab;
+
+  function filterStudentsTab(q) {
+    const tbody = document.getElementById('studentsTbody');
+    const filtered = q ? allStudentsTab.filter(s => 
+      (s.name || '').toLowerCase().includes(q.toLowerCase()) || 
+      (s.roll_number || '').toLowerCase().includes(q.toLowerCase())
+    ) : allStudentsTab;
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;">No students found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(s => {
+      const pct = s.total_sessions > 0 ? Math.round((s.present_count / s.total_sessions) * 100) : 0;
+      const statusClass = pct >= 75 ? 'badge-safe' : 'badge-danger';
+      return `
+      <tr>
+        <td data-label="Roll No"><span class="mono">${s.roll_number}</span></td>
+        <td data-label="Name" style="font-weight:600;">${s.name}</td>
+        <td data-label="Batch">${s.batch_year}</td>
+        <td data-label="Course"><span class="badge" style="background:var(--bg-hover);color:var(--text-2);">${s.course_code}</span></td>
+        <td data-label="Attendance"><span class="badge ${statusClass}">${pct}% (${s.present_count}/${s.total_sessions})</span></td>
+        <td data-label="Actions" style="text-align:right;">
+          <button class="btn btn-ghost btn-sm" onclick="openStudentDetails(${s.student_id})">Details</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  window.filterStudentsTab = filterStudentsTab;
+
+  async function openStudentDetails(id) {
+    try {
+      const res = await SAMS.apiFetch(`/api/faculty/students/${id}/details`);
+      const data = await res.json();
+      if (!res.ok) { SAMS.toast(data.error || 'Error fetching details', 'error'); return; }
+      
+      currentEditingStudent = data.student;
+      
+      // Populate Details Modal
+      document.getElementById('dtlName').textContent = data.student.name;
+      document.getElementById('dtlRoll').textContent = data.student.roll_number;
+      document.getElementById('dtlBatch').textContent = data.student.batch_year;
+      document.getElementById('dtlEmail').textContent = data.student.email || 'N/A';
+      
+      document.getElementById('dtlCourses').innerHTML = data.courses.map(c => {
+        const pct = c.total_sessions > 0 ? Math.round((c.present_count / c.total_sessions) * 100) : 0;
+        const cl = pct >= 75 ? 'badge-safe' : 'badge-danger';
+        return `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+          <span><strong>${c.course_code}</strong> - ${c.course_name}</span>
+          <span class="badge ${cl}">${pct}%</span>
+        </div>`;
+      }).join('');
+      
+      document.getElementById('dtlHistory').innerHTML = data.history.map(h => {
+        const d = new Date(h.session_date).toLocaleDateString();
+        const cl = h.status === 'Present' ? 'badge-safe' : 'badge-danger';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;flex-direction:column;gap:0.25rem;">
+            <span style="font-weight:600;">${h.course_code}</span>
+            <span style="font-size:0.75rem;color:var(--text-3);">${d} ${h.start_time}</span>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <span class="badge ${cl}">${h.status}</span>
+            <button class="btn btn-ghost btn-sm" onclick="openCorrectModal(${h.session_id}, ${data.student.student_id}, '${h.status}')"><i data-lucide="edit-3"></i></button>
+          </div>
+        </div>`;
+      }).join('');
+      
+      lucide.createIcons();
+      document.getElementById('modalStudentDetails').classList.add('show');
+    } catch { SAMS.toast('Network error', 'error'); }
+  }
+  window.openStudentDetails = openStudentDetails;
+
+  function closeStudentDetails() { document.getElementById('modalStudentDetails').classList.remove('show'); }
+  window.closeStudentDetails = closeStudentDetails;
+
+  let currentEditingStudent = null;
+  function openEditStudent() {
+    if (!currentEditingStudent) return;
+    document.getElementById('editStuName').value = currentEditingStudent.name;
+    document.getElementById('editStuRoll').value = currentEditingStudent.roll_number;
+    document.getElementById('editStuBatch').value = currentEditingStudent.batch_year;
+    document.getElementById('modalEditStudent').classList.add('show');
+  }
+  window.openEditStudent = openEditStudent;
+  
+  function closeEditStudent() { document.getElementById('modalEditStudent').classList.remove('show'); }
+  window.closeEditStudent = closeEditStudent;
+
+  async function saveStudentEdit(e) {
+    e.preventDefault();
+    if (!currentEditingStudent) return;
+    const btn = document.getElementById('saveEditBtn');
+    btn.disabled = true;
+    try {
+      const payload = {
+        name: document.getElementById('editStuName').value,
+        roll_number: document.getElementById('editStuRoll').value,
+        batch_year: document.getElementById('editStuBatch').value
+      };
+      const res = await SAMS.apiFetch(`/api/faculty/students/${currentEditingStudent.student_id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) { SAMS.toast(data.error || 'Failed to update', 'error'); return; }
+      SAMS.toast('Student updated', 'success');
+      closeEditStudent();
+      openStudentDetails(currentEditingStudent.student_id);
+      loadStudentsTab();
+    } catch { SAMS.toast('Network error', 'error'); } finally { btn.disabled = false; }
+  }
+  window.saveStudentEdit = saveStudentEdit;
+
+  let correctAttSession = null;
+  let correctAttStudent = null;
+  function openCorrectModal(sessionId, studentId, currentStatus) {
+    correctAttSession = sessionId;
+    correctAttStudent = studentId;
+    document.getElementById('corrStatus').value = currentStatus;
+    document.getElementById('corrReason').value = '';
+    document.getElementById('modalCorrectAtt').classList.add('show');
+  }
+  window.openCorrectModal = openCorrectModal;
+  function closeCorrectModal() { document.getElementById('modalCorrectAtt').classList.remove('show'); }
+  window.closeCorrectModal = closeCorrectModal;
+
+  async function saveCorrectAtt(e) {
+    e.preventDefault();
+    const btn = document.getElementById('saveCorrBtn');
+    const reason = document.getElementById('corrReason').value.trim();
+    if (!reason) { SAMS.toast('Reason is required for audit logs', 'error'); return; }
+    btn.disabled = true;
+    try {
+      const res = await SAMS.apiFetch(`/api/faculty/sessions/${correctAttSession}/attendance`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          records: [{ student_id: correctAttStudent, status: document.getElementById('corrStatus').value }],
+          reason
+        })
+      });
+      if (!res.ok) { const d = await res.json(); SAMS.toast(d.error || 'Error', 'error'); return; }
+      SAMS.toast('Attendance corrected', 'success');
+      closeCorrectModal();
+      openStudentDetails(correctAttStudent);
+      loadStudentsTab();
+    } catch { SAMS.toast('Network error', 'error'); } finally { btn.disabled = false; }
+  }
+  window.saveCorrectAtt = saveCorrectAtt;
 
   /* ── Load courses into dropdowns ── */
   async function loadCourseDropdowns() {
@@ -478,12 +798,20 @@
       document.getElementById('liveCourseLabel').textContent =
         sel.options[sel.selectedIndex]?.text || '';
 
-      // QR code fallback display (text since we don't have a QR library)
+      // QR code generation
       const qrEl = document.getElementById('qrCode');
-      qrEl.style.fontSize = '1rem';
-      qrEl.style.fontFamily = 'monospace';
-      qrEl.style.fontWeight = '700';
-      qrEl.textContent = token;
+      qrEl.innerHTML = '';
+      qrEl.style.fontSize = '';
+      qrEl.style.fontFamily = '';
+      qrEl.style.fontWeight = '';
+      new QRCode(qrEl, {
+        text: token,
+        width: 160,
+        height: 160,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+      });
 
       // Countdown timer
       clearInterval(timerInterval);
@@ -517,6 +845,7 @@
     document.getElementById('stopBtn').style.display = 'none';
     document.getElementById('tokenStatus').textContent = 'Live';
     document.getElementById('tokenStatus').className = 'badge badge-safe';
+    document.getElementById('qrCode').innerHTML = 'Generating…';
   }
   window.stopSession = stopSession;
 
