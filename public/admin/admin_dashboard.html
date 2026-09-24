@@ -1310,7 +1310,7 @@
           <td data-label="Role"><span class="badge badge-muted">${escHtml(r.role||'—')}</span></td>
           <td data-label="Action"><span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--primary);">${escHtml(r.action)}</span></td>
           <td data-label="Entity">${r.entity_type ? `<span class="badge badge-info">${escHtml(r.entity_type)} ${r.entity_id||''}</span>` : '—'}</td>
-          <td data-label="Details" style="font-size:0.75rem;color:var(--text-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.detail ? JSON.stringify(JSON.parse(r.detail)) : '—'}</td>
+          <td data-label="Details" style="font-size:0.75rem;color:var(--text-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(formatAuditDetail(r.detail))}</td>
         </tr>`;
       }).join('');
       document.getElementById('auditMeta').textContent = `${rows.length} of ${data.total} entries`;
@@ -1463,6 +1463,27 @@
       no_classes:     '<span class="badge badge-muted">No Data</span>',
     };
     return map[status] || '<span class="badge badge-muted">—</span>';
+  }
+
+  function formatAuditDetail(detail) {
+    if (detail === null || detail === undefined || detail === '') {
+        return '—';
+    }
+
+    if (typeof detail !== 'string') {
+        try {
+            return JSON.stringify(detail);
+        } catch {
+            return String(detail);
+        }
+    }
+
+    try {
+        const parsed = JSON.parse(detail);
+        return JSON.stringify(parsed);
+    } catch {
+        return detail;
+    }
   }
 
   /* ── Init ── */

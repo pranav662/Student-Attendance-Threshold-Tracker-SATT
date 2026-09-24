@@ -73,11 +73,12 @@ async function run() {
   check('Admin /departments (200)', depts.status === 200, JSON.stringify(depts.body));
 
   console.log('\n── DEPARTMENT CRUD TEST ──────────────────────────');
-  const deptCreate = await req('/api/admin/departments', { dept_code: 'TESTDEPT', dept_name: 'Test Dept' }, 'POST', adminToken);
-  check('Admin POST /departments (201)', deptCreate.status === 201 || deptCreate.status === 409, JSON.stringify(deptCreate.body));
+  const dCode = 'D' + Date.now();
+  const deptCreate = await req('/api/admin/departments', { dept_code: dCode, dept_name: 'Test ' + dCode }, 'POST', adminToken);
+  check('Admin POST /departments (201)', deptCreate.status === 201, JSON.stringify(deptCreate.body));
   if (deptCreate.status === 201) {
     const deptId = deptCreate.body.dept_id;
-    const deptEdit = await req(`/api/admin/departments/${deptId}`, { dept_code: 'TEST2', dept_name: 'Test Dept 2' }, 'PUT', adminToken);
+    const deptEdit = await req(`/api/admin/departments/${deptId}`, { dept_code: dCode + 'X', dept_name: 'Test ' + dCode + ' Edit' }, 'PUT', adminToken);
     check('Admin PUT /departments/:id (200)', deptEdit.status === 200, JSON.stringify(deptEdit.body));
 
     const deptDelete = await req(`/api/admin/departments/${deptId}`, null, 'DELETE', adminToken);
@@ -174,6 +175,34 @@ async function run() {
   
   const editUnauthStu = await req('/api/faculty/students/99999', { name: 'Test', roll_number: '123', batch_year: 2024 }, 'PUT', facToken);
   check('Faculty cross-course/semester student edit blocked (403)', editUnauthStu.status === 403 || editUnauthStu.status === 404);
+
+  console.log('\n── QR ATTENDANCE INTEGRATION TEST ────────────────');
+  // Faculty creates QR for an existing course they own
+  if (facCourses.status === 200 && facCourses.body.length > 0) {
+    const cid = facCourses.body[0].course_id;
+    const qrGen = await req('/api/qr/generate', { course_id: cid, duration_minutes: 5 }, 'POST', facToken);
+    check('Faculty QR Generate (201)', qrGen.status === 201, JSON.stringify(qrGen.body));
+    
+    if (qrGen.status === 201) {
+      const token = qrGen.body.token;
+      
+      // Attempt scan with an enrolled student (assuming stuToken is enrolled in something... wait, we can just test if the endpoint responds appropriately)
+      // Actually let's enroll stu in this course first if not already
+      await req('/api/student/enroll-course', { course_id: cid, semester: facCourses.body[0].semester }, 'POST', stuToken);
+      
+      const qrScan = await req('/api/qr/scan', { token }, 'POST', stuToken);
+      check('Student QR Scan (200/409)', qrScan.status === 200 || qrScan.status === 409, JSON.stringify(qrScan.body));
+      
+      const sessAttn = await req(`/api/faculty/sessions/${qrGen.body.session_id}/attendance`, null, 'GET', facToken);
+      check('Faculty session has attendance data (200)', sessAttn.status === 200);
+      if (sessAttn.status === 200 && Array.isArray(sessAttn.body)) {
+         const pres = sessAttn.body.filter(s => s.status === 'Present').length;
+         check('Student marked present in session', pres > 0);
+      }
+    }
+  } else {
+    console.log('  ! Skipping QR Integration Test: No assigned courses for faculty.');
+  }
 
   console.log('\n── PDF ───────────────────────────────────────────');
 

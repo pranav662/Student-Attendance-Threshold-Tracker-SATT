@@ -1141,13 +1141,11 @@ app.get('/api/faculty/sessions', authenticate, requireRole('faculty'), async (re
 
     const [sessions] = await pool.execute(
       `SELECT s.session_id, s.session_date, s.start_time,
-              COUNT(ar.record_id) AS present_count,
+              (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = s.session_id AND ar.status = 'Present') AS present_count,
               (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = s.course_id AND e.semester = s.semester) AS total_students
        FROM sessions s
        JOIN faculty_assignments fa ON s.course_id = fa.course_id AND s.semester = fa.semester
-       LEFT JOIN attendance_records ar ON ar.session_id = s.session_id AND ar.status = 'Present'
        WHERE s.course_id = ? AND s.faculty_id = ? AND fa.faculty_id = ?
-       GROUP BY s.session_id, s.session_date, s.start_time, s.course_id, s.semester
        ORDER BY s.session_date DESC, s.start_time DESC`,
       [courseId, facultyId, facultyId]
     );

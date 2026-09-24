@@ -555,6 +555,13 @@
     }
     document.getElementById('topbarTitle').textContent = TITLES[name] || name;
     closeSidebar();
+    
+    // Clear past sessions polling if leaving section
+    if (window.pastSessionsPollInterval) {
+      clearInterval(window.pastSessionsPollInterval);
+      window.pastSessionsPollInterval = null;
+    }
+
     if (name === 'courses') loadMyCourses();
     if (name === 'assign')  loadAssignableCourses();
     if (name === 'students') loadStudentsTab();
@@ -566,9 +573,22 @@
         // We can just call loadPastSessions() which checks if courseId exists.
       }
       loadPastSessions();
+      
+      // Start polling for past sessions
+      window.pastSessionsPollInterval = setInterval(() => {
+        if (!document.getElementById('sessionDetailsCard') || document.getElementById('sessionDetailsCard').style.display === 'none') {
+          loadPastSessions(true); // pass true for silent refresh
+        }
+      }, 5000);
     }
   }
   window.gotoSection = gotoSection;
+  
+  window.addEventListener('beforeunload', () => {
+    if (window.pastSessionsPollInterval) {
+      clearInterval(window.pastSessionsPollInterval);
+    }
+  });
 
   /* ── Mobile sidebar ── */
   function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('backdrop').classList.add('show'); }
@@ -1057,20 +1077,24 @@
   window.assignCourse = assignCourse;
 
   /* ── Past Sessions ── */
-  async function loadPastSessions() {
+  async function loadPastSessions(silent = false) {
     const courseId = document.getElementById('sessionCourseSelect').value;
     const listCard = document.getElementById('sessionsListCard');
     const detailsCard = document.getElementById('sessionDetailsCard');
     const container = document.getElementById('sessionsListContainer');
     
-    detailsCard.style.display = 'none';
+    if (!silent) {
+      detailsCard.style.display = 'none';
+    }
     if (!courseId) {
       listCard.style.display = 'none';
       return;
     }
     
     listCard.style.display = 'block';
-    container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading sessions...</p></div>`;
+    if (!silent) {
+      container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading sessions...</p></div>`;
+    }
     
     try {
       const res = await SAMS.apiFetch(`/api/faculty/sessions?course_id=${courseId}`);
@@ -1224,6 +1248,19 @@
     a.click();
   }
   window.downloadReport = downloadReport;
+
+  /* ── Modal Close Events ── */
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal.show').forEach(m => m.classList.remove('show'));
+    }
+  });
+
+  window.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+      e.target.classList.remove('show');
+    }
+  });
 
   /* ── Init ── */
   loadUser();
