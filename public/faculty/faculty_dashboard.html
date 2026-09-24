@@ -572,6 +572,7 @@
       const res  = await SAMS.apiFetch('/api/me');
       if (!res.ok) return;
       const data = await res.json();
+      window.APP_THRESHOLD = data.threshold || 75;
       const name = data.name || data.email || 'Faculty';
       document.getElementById('sidebarName').textContent = name;
       document.getElementById('sidebarAv').textContent   = name.charAt(0).toUpperCase();
@@ -610,7 +611,7 @@
 
     tbody.innerHTML = filtered.map(s => {
       const pct = s.total_sessions > 0 ? Math.round((s.present_count / s.total_sessions) * 100) : 0;
-      const statusClass = pct >= 75 ? 'badge-safe' : 'badge-danger';
+      const statusClass = pct >= (window.APP_THRESHOLD || 75) ? 'badge-safe' : 'badge-danger';
       return `
       <tr>
         <td data-label="Roll No"><span class="mono">${s.roll_number}</span></td>
@@ -642,7 +643,7 @@
       
       document.getElementById('dtlCourses').innerHTML = data.courses.map(c => {
         const pct = c.total_sessions > 0 ? Math.round((c.present_count / c.total_sessions) * 100) : 0;
-        const cl = pct >= 75 ? 'badge-safe' : 'badge-danger';
+        const cl = pct >= (window.APP_THRESHOLD || 75) ? 'badge-safe' : 'badge-danger';
         return `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
           <span><strong>${c.course_code}</strong> - ${c.course_name}</span>
           <span class="badge ${cl}">${pct}%</span>

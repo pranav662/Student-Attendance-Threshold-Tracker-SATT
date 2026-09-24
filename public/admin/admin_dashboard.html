@@ -260,7 +260,7 @@
             <div class="section-head">
               <div>
                 <div class="card-title">At-Risk Students</div>
-                <div class="card-sub">Students below 75% attendance</div>
+                <div class="card-sub">Students below <span class="thr-text">75%</span> attendance</div>
               </div>
               <button class="btn btn-ghost btn-sm" onclick="gotoSection('atrisk',null)">
                 <i data-lucide="arrow-right"></i> View All
@@ -488,13 +488,13 @@
         <div class="page-head">
           <div class="eyebrow">Attendance</div>
           <h1>At-Risk Students</h1>
-          <p>Students whose overall attendance is below the 75% required threshold.</p>
+          <p>Students whose overall attendance is below the <span class="thr-text">75%</span> required threshold.</p>
         </div>
         <div class="card" id="atRiskSummaryCard" style="margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
           <div style="font-size:1.75rem;font-weight:700;color:var(--danger);" id="atRiskCount">—</div>
           <div>
             <div style="font-weight:600;color:var(--text-1);">Students At Risk</div>
-            <div style="font-size:0.8125rem;color:var(--text-3);">Below 75% overall attendance threshold</div>
+            <div style="font-size:0.8125rem;color:var(--text-3);">Below <span class="thr-text">75%</span> overall attendance threshold</div>
           </div>
         </div>
         <div class="card" style="padding:0;">
@@ -586,7 +586,7 @@
           <div class="form-group">
             <label class="form-label" for="settingThreshold">Attendance Threshold (%)</label>
             <input class="form-input" id="settingThreshold" type="number" min="50" max="100" step="1" placeholder="75">
-            <div class="form-hint">Minimum attendance percentage required (default: 75%)</div>
+            <div class="form-hint">Minimum attendance percentage required (default: <span class="thr-text">75%</span>)</div>
           </div>
           <div class="form-group">
             <label class="form-label" for="settingYear">Academic Year</label>
@@ -774,6 +774,8 @@
       const res  = await SAMS.apiFetch('/api/me');
       if (!res.ok) return;
       const data = await res.json();
+      window.APP_THRESHOLD = data.threshold || 75;
+      document.querySelectorAll('.thr-text').forEach(el => el.textContent = window.APP_THRESHOLD + '%');
       const name = data.name || data.email || 'Admin';
       document.getElementById('sidebarName').textContent = name;
       document.getElementById('sidebarAv').textContent   = name.charAt(0).toUpperCase();
@@ -915,7 +917,7 @@
         const total = Number(s.total_classes) || 0;
         const att   = Number(s.attended_classes) || 0;
         const pct   = total > 0 ? ((att / total) * 100).toFixed(1) : '—';
-        const pctColor = total > 0 ? (pct >= 75 ? 'var(--success)' : 'var(--danger)') : 'var(--text-3)';
+        const pctColor = total > 0 ? (pct >= (window.APP_THRESHOLD || 75) ? 'var(--success)' : 'var(--danger)') : 'var(--text-3)';
         const statusBadge = s.status === 'approved' ? '<span class="badge badge-safe">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
         const safeName = escAttr(s.name);
         const safeRoll = escAttr(s.roll_number);
@@ -1154,7 +1156,7 @@
         return;
       }
       tbody.innerHTML = rows.map(r => {
-        const pctColor = r.percentage >= 75 ? 'var(--success)' : 'var(--danger)';
+        const pctColor = r.percentage >= (window.APP_THRESHOLD || 75) ? 'var(--success)' : 'var(--danger)';
         const badge = statusBadge(r.status);
         return `<tr>
           <td data-label="Student"><div style="font-weight:600;">${escHtml(r.name)}</div></td>

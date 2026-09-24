@@ -128,6 +128,12 @@ async function run() {
   const me = await req('/api/me', null, 'GET', stuToken);
   check('Student /api/me (200)', me.status === 200);
 
+  // 18a. Dynamic Threshold Test
+  await req('/api/admin/settings', { attendance_threshold: 80 }, 'PUT', adminToken);
+  const me2 = await req('/api/me', null, 'GET', stuToken);
+  check('Threshold dynamically updates to 80', me2.body.threshold === 80);
+  await req('/api/admin/settings', { attendance_threshold: 75 }, 'PUT', adminToken);
+
   console.log('\n── FACULTY APIs ──────────────────────────────────');
 
   // 19. Faculty courses
@@ -177,6 +183,46 @@ async function run() {
     r.on('error', e => resolve({ status: -1 }));
   });
   check('Faculty PDF Unauthorized (403)', facPdf.status === 403);
+
+  console.log('\n── SECURITY VALIDATION ───────────────────────────');
+  
+  async function testUpload(filename, buffer) {
+    return new Promise((resolve) => {
+      const boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW';
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="profile_pic"; filename="${filename}"\r\nContent-Type: image/jpeg\r\n\r\n`),
+        buffer,
+        Buffer.from(`\r\n--${boundary}--\r\n`)
+      ]);
+      const opts = {
+        hostname: 'localhost', port: 3000, path: '/api/profile/upload-pic', method: 'POST',
+        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Authorization': 'Bearer ' + stuToken, 'Content-Length': body.length }
+      };
+      const r = http.request(opts, res => resolve(res.statusCode));
+      r.on('error', () => resolve(-1));
+      r.write(body);
+      r.end();
+    });
+  }
+
+  // WEBP Test
+  const jpegBuf = Buffer.from('FFD8FFE000104A4649460001', 'hex');
+  check('Upload valid JPEG (200)', await testUpload('test.jpg', jpegBuf) === 200);
+  
+  const pngBuf = Buffer.from('89504E470D0A1A0A', 'hex');
+  check('Upload valid PNG (200)', await testUpload('test.png', pngBuf) === 200);
+  
+  const gifBuf = Buffer.from('474946383961', 'hex'); // GIF89a
+  check('Upload valid GIF (200)', await testUpload('test.gif', gifBuf) === 200);
+  
+  const webpBuf = Buffer.from('524946460000000057454250', 'hex'); // RIFF....WEBP
+  check('Upload valid WEBP (200)', await testUpload('test.webp', webpBuf) === 200);
+  
+  const fakeWebpBuf = Buffer.from('524946460000000046414B45', 'hex'); // RIFF....FAKE
+  check('Upload fake WEBP (rejected 400)', await testUpload('test.webp', fakeWebpBuf) === 400);
+  
+  const invalidBuf = Buffer.from('0000000000000000', 'hex');
+  check('Upload invalid image (rejected 400)', await testUpload('test.jpg', invalidBuf) === 400);
 
   console.log(`\n────────────────────────────────────────────────`);
   console.log(`RESULTS: ${pass} passed, ${fail} failed`);

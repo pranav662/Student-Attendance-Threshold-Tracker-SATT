@@ -272,17 +272,17 @@ app.get('/api/admin/stats', authenticate, requireRole('admin'), async (req, res,
     const [[sessions]]  = await pool.execute('SELECT COUNT(*) AS count FROM sessions');
     const [[todaySess]] = await pool.execute('SELECT COUNT(*) AS count FROM sessions WHERE session_date = CURDATE()');
 
-    // At-risk: students where overall attendance < 75%
+    const threshold = await getAttendanceThreshold();
     const [atRiskRows] = await pool.execute(`
       SELECT s.student_id,
         COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended,
         (SELECT COUNT(DISTINCT se.session_id) FROM sessions se
-         JOIN enrollments e ON e.course_id = se.course_id WHERE e.student_id = s.student_id) AS total
+         JOIN enrollments e ON e.course_id = se.course_id AND e.semester = se.semester WHERE e.student_id = s.student_id) AS total
       FROM students s
       LEFT JOIN attendance_records ar ON ar.student_id = s.student_id
       GROUP BY s.student_id
-      HAVING total > 0 AND (attended / total * 100) < 75
-    `);
+      HAVING total > 0 AND (attended / total * 100) < ?
+    `, [threshold]);
 
     return res.json({
       students:   students.count,
@@ -948,26 +948,27 @@ app.get('/api/faculty/students', authenticate, requireRole('faculty'), async (re
 
       const [students] = await pool.execute(
         `SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email, c.course_id, c.course_code, c.course_name,
-         (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ar.status = 'Present') as present_count,
-         (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = e.course_id) as total_sessions
+         (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ss.semester = e.semester AND ar.status = 'Present') as present_count,
+         (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = e.course_id AND ss.semester = e.semester) as total_sessions
          FROM students s
          JOIN users u ON s.user_id = u.user_id
          JOIN enrollments e ON s.student_id = e.student_id
          JOIN courses c ON e.course_id = c.course_id
-         WHERE e.course_id = ? ORDER BY s.name`,
-        [courseId]
+         JOIN faculty_assignments fa ON fa.course_id = c.course_id AND fa.semester = e.semester
+         WHERE e.course_id = ? AND fa.faculty_id = ? ORDER BY s.name`,
+        [courseId, facultyId]
       );
       return res.json(students);
     } else {
       const [students] = await pool.execute(
         `SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email, c.course_id, c.course_code, c.course_name,
-         (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ar.status = 'Present') as present_count,
-         (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = e.course_id) as total_sessions
+         (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ss.semester = e.semester AND ar.status = 'Present') as present_count,
+         (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = e.course_id AND ss.semester = e.semester) as total_sessions
          FROM students s
          JOIN users u ON s.user_id = u.user_id
          JOIN enrollments e ON s.student_id = e.student_id
          JOIN courses c ON e.course_id = c.course_id
-         JOIN faculty_assignments fa ON c.course_id = fa.course_id
+         JOIN faculty_assignments fa ON c.course_id = fa.course_id AND fa.semester = e.semester
          WHERE fa.faculty_id = ? ORDER BY s.name, c.course_code`,
         [facultyId]
       );
@@ -986,7 +987,7 @@ app.get('/api/faculty/students/:id/details', authenticate, requireRole('faculty'
     // Verify faculty teaches the student in at least one course
     const [authCheck] = await pool.execute(
       `SELECT 1 FROM enrollments e
-       JOIN faculty_assignments fa ON e.course_id = fa.course_id
+       JOIN faculty_assignments fa ON e.course_id = fa.course_id AND e.semester = fa.semester
        WHERE e.student_id = ? AND fa.faculty_id = ? LIMIT 1`,
       [studentId, facultyId]
     );
@@ -1001,11 +1002,11 @@ app.get('/api/faculty/students/:id/details', authenticate, requireRole('faculty'
 
     const [courses] = await pool.execute(
       `SELECT c.course_id, c.course_code, c.course_name,
-       (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = ? AND ss.course_id = c.course_id AND ar.status = 'Present') as present_count,
-       (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = c.course_id) as total_sessions
+       (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ar.session_id = ss.session_id WHERE ar.student_id = ? AND ss.course_id = c.course_id AND ss.semester = e.semester AND ar.status = 'Present') as present_count,
+       (SELECT COUNT(*) FROM sessions ss WHERE ss.course_id = c.course_id AND ss.semester = e.semester) as total_sessions
        FROM courses c
        JOIN enrollments e ON c.course_id = e.course_id
-       JOIN faculty_assignments fa ON c.course_id = fa.course_id
+       JOIN faculty_assignments fa ON c.course_id = fa.course_id AND fa.semester = e.semester
        WHERE e.student_id = ? AND fa.faculty_id = ?`,
       [studentId, studentId, facultyId]
     );
@@ -1015,7 +1016,7 @@ app.get('/api/faculty/students/:id/details', authenticate, requireRole('faculty'
        FROM attendance_records ar
        JOIN sessions ss ON ar.session_id = ss.session_id
        JOIN courses c ON ss.course_id = c.course_id
-       JOIN faculty_assignments fa ON c.course_id = fa.course_id
+       JOIN faculty_assignments fa ON c.course_id = fa.course_id AND fa.semester = ss.semester
        WHERE ar.student_id = ? AND fa.faculty_id = ?
        ORDER BY ss.session_date DESC, ss.start_time DESC LIMIT 20`,
       [studentId, facultyId]
@@ -1110,9 +1111,11 @@ app.get('/api/faculty/sessions', authenticate, requireRole('faculty'), async (re
     if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
 
     const [sessions] = await pool.execute(
-      `SELECT session_id, session_date, start_time 
-       FROM sessions WHERE course_id = ? AND faculty_id = ? ORDER BY session_date DESC, start_time DESC`,
-      [courseId, facultyId]
+      `SELECT s.session_id, s.session_date, s.start_time 
+       FROM sessions s
+       JOIN faculty_assignments fa ON s.course_id = fa.course_id AND s.semester = fa.semester
+       WHERE s.course_id = ? AND s.faculty_id = ? AND fa.faculty_id = ? ORDER BY s.session_date DESC, s.start_time DESC`,
+      [courseId, facultyId, facultyId]
     );
     return res.json(sessions);
   } catch (error) { return next(error); }
@@ -1126,11 +1129,12 @@ app.get('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
     if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
     const facultyId = faculties[0].faculty_id;
 
-    const [sessions] = await pool.execute('SELECT course_id FROM sessions WHERE session_id = ? AND faculty_id = ?', [sessionId, facultyId]);
+    const [sessions] = await pool.execute('SELECT course_id, semester FROM sessions WHERE session_id = ? AND faculty_id = ?', [sessionId, facultyId]);
     if (!sessions.length) return fail(res, 403, 'Unauthorized or session not found.');
     
     const courseId = sessions[0].course_id;
-    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+    const semester = sessions[0].semester;
+    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ? AND semester = ?', [facultyId, courseId, semester]);
     if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
 
     const [records] = await pool.execute(
@@ -1156,18 +1160,19 @@ app.put('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
     if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
     const facultyId = faculties[0].faculty_id;
 
-    const [sessions] = await connection.execute('SELECT course_id FROM sessions WHERE session_id = ? AND faculty_id = ? FOR UPDATE', [sessionId, facultyId]);
+    const [sessions] = await connection.execute('SELECT course_id, semester FROM sessions WHERE session_id = ? AND faculty_id = ? FOR UPDATE', [sessionId, facultyId]);
     if (!sessions.length) return fail(res, 403, 'Unauthorized or session not found.');
     const courseId = sessions[0].course_id;
+    const semester = sessions[0].semester;
     
-    const [assignment] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+    const [assignment] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ? AND semester = ?', [facultyId, courseId, semester]);
     if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
 
     await connection.beginTransaction();
     for (const record of records) {
       if (!record.student_id) continue;
       
-      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?', [record.student_id, courseId]);
+      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ? AND semester = ?', [record.student_id, courseId, semester]);
       if (!enroll.length) continue;
 
       const status = record.status === 'Absent' ? 'Absent' : 'Present';
@@ -1219,20 +1224,21 @@ app.get('/api/faculty/report/pdf', authenticate, requireRole('faculty'), async (
     
     const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [faculty[0].faculty_id, courseId]);
     if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+    const semester = assignment[0].semester;
+
+    const threshold = await getAttendanceThreshold();
 
     const [courseInfo] = await pool.execute('SELECT course_code, course_name FROM courses WHERE course_id = ?', [courseId]);
     if (!courseInfo[0]) return fail(res, 404, 'Course not found.');
     const [students] = await pool.execute(
       `SELECT s.name, s.roll_number,
-              COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended,
-              (SELECT COUNT(*) FROM sessions WHERE course_id = ?) AS total
+              (SELECT COUNT(*) FROM attendance_records ar JOIN sessions ss ON ss.session_id = ar.session_id WHERE ar.student_id = s.student_id AND ss.course_id = e.course_id AND ss.semester = e.semester AND ar.status = 'Present') AS attended,
+              (SELECT COUNT(*) FROM sessions WHERE course_id = ? AND semester = ?) AS total
        FROM students s
        JOIN enrollments e ON s.student_id = e.student_id
-       LEFT JOIN attendance_records ar ON ar.student_id = s.student_id AND ar.status = 'Present'
-       WHERE e.course_id = ?
-       GROUP BY s.student_id, s.name, s.roll_number
+       WHERE e.course_id = ? AND e.semester = ?
        ORDER BY s.name`,
-      [courseId, courseId]
+      [courseId, semester, courseId, semester]
     );
 
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -1601,7 +1607,9 @@ app.get('/api/me', authenticate, async (req, res, next) => {
       [req.user.sub]
     );
     if (!rows[0]) return fail(res, 404, 'User not found.');
-    res.json(rows[0]);
+    const threshold = await getAttendanceThreshold();
+    const data = { ...rows[0], threshold };
+    res.json(data);
   } catch (e) { return next(e); }
 });
 
@@ -1642,7 +1650,7 @@ app.post('/api/profile/upload-pic', authenticate, upload.single('profile_pic'), 
     if (magic.startsWith('FFD8FF')) isImage = true; // JPEG
     else if (magic.startsWith('89504E47')) isImage = true; // PNG
     else if (magic.startsWith('47494638')) isImage = true; // GIF
-    else if (magic.startsWith('52494646')) isImage = true; // WEBP
+    else if (magic.startsWith('52494646') && buffer.length >= 12 && buffer.toString('hex', 8, 12).toUpperCase() === '57454250') isImage = true; // WEBP
 
     if (!isImage) {
       fs.unlinkSync(req.file.path);
