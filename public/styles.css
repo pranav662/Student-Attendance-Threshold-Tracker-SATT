@@ -2030,42 +2030,45 @@ body.auth-body {
   z-index: 199;
 }
 .sidebar-backdrop.show { display: block; }
- 
+
+ 
  
 /* ----------------------------------------------------------
    MODALS
-   ---------------------------------------------------------- */
 .modal {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgba(0,0,0,0.55);
-  z-index: 9998;
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.60);
+    z-index: 9998;
+    overflow-y: auto;
 }
 
 .modal.show {
-  display: flex;
+    display: flex;
 }
 
 .modal-content {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  width: min(100%, 600px);
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: var(--shadow-lg);
+    width: min(100%, 600px);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    background: var(--bg-card);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
 }
 
 .modal-title {
@@ -2075,6 +2078,5 @@ body.auth-body {
 }
 
 .modal-body {
-  padding: 1.25rem;
+    padding: 1.25rem;
 }
-

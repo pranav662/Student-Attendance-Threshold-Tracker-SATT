@@ -577,7 +577,7 @@
       // Start polling for past sessions
       window.pastSessionsPollInterval = setInterval(() => {
         if (!document.getElementById('sessionDetailsCard') || document.getElementById('sessionDetailsCard').style.display === 'none') {
-          loadPastSessions(true); // pass true for silent refresh
+          loadPastSessions(true); } else { if (!window.attendanceIsDirty && currentSessionId) { loadSessionAttendance(currentSessionId, true); }
         }
       }, 5000);
     }
@@ -613,11 +613,11 @@
   /* ── Load students tab ── */
   let allStudentsTab = [];
   async function loadStudentsTab() {
-    const course_id = document.getElementById('stuFilterCourse').value;
+    const assignment_id = document.getElementById('stuFilterCourse').value;
     const tbody = document.getElementById('studentsTbody');
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;">Loading…</td></tr>`;
     try {
-      const res = await SAMS.apiFetch(`/api/faculty/students${course_id ? '?course_id='+course_id : ''}`);
+      const res = await SAMS.apiFetch(`/api/faculty/students${assignment_id ? '?assignment_id='+assignment_id : ''}`);
       const data = await res.json();
       allStudentsTab = Array.isArray(data) ? data : [];
       filterStudentsTab(document.getElementById('stuSearchInput').value);
@@ -738,7 +738,7 @@
       closeEditStudent();
       openStudentDetails(currentEditingStudent.student_id);
       loadStudentsTab();
-    } catch { SAMS.toast('Network error', 'error'); } finally { btn.disabled = false; }
+    } catch { SAMS.toast('Network error', 'error'); } finally { btn.disabled = false; window.attendanceIsDirty = false; }
   }
   window.saveStudentEdit = saveStudentEdit;
 
@@ -774,7 +774,7 @@
       closeCorrectModal();
       openStudentDetails(correctAttStudent);
       loadStudentsTab();
-    } catch { SAMS.toast('Network error', 'error'); } finally { btn.disabled = false; }
+    } catch { SAMS.toast('Network error', 'error'); } finally { btn.disabled = false; window.attendanceIsDirty = false; }
   }
   window.saveCorrectAtt = saveCorrectAtt;
 
@@ -791,7 +791,7 @@
         sel.innerHTML = `<option value="">— Select a course —</option>`;
         courses.forEach(c => {
           const opt = document.createElement('option');
-          opt.value = c.course_id;
+          opt.value = c.assignment_id; // Using assignment_id instead of course_id
           opt.textContent = `${c.course_code} — ${c.course_name} (${c.semester})`;
           sel.appendChild(opt);
         });
@@ -804,17 +804,17 @@
 
   /* ── Generate QR ── */
   async function generateQR() {
-    const course_id = document.getElementById('liveCourseSelect').value;
+    const assignment_id = document.getElementById('liveCourseSelect').value;
     const minutes   = parseInt(document.getElementById('liveDuration').value) || 10;
-    if (!course_id) { SAMS.toast('Please select a course.', 'error'); return; }
+    if (!assignment_id) { SAMS.toast('Please select a course.', 'error'); return; }
 
     const btn = document.getElementById('generateBtn');
     btn.disabled = true;
 
     try {
-      const res  = await SAMS.apiFetch('/api/qr/generate', { method:'POST', body: JSON.stringify({ course_id, duration_minutes: minutes }) });
+      const res  = await SAMS.apiFetch('/api/qr/generate', { method:'POST', body: JSON.stringify({ assignment_id, duration_minutes: minutes }) });
       const data = await res.json();
-      if (!res.ok) { SAMS.toast(data.error || 'Failed to generate session.', 'error'); btn.disabled = false; return; }
+      if (!res.ok) { SAMS.toast(data.error || 'Failed to generate session.', 'error'); btn.disabled = false; window.attendanceIsDirty = false; return; }
 
       const token = data.token;
       const expiresAt = new Date(data.expires_at || Date.now() + minutes * 60000);
@@ -863,9 +863,9 @@
 
     } catch {
       SAMS.toast('Network error.', 'error');
-      btn.disabled = false;
+      btn.disabled = false; window.attendanceIsDirty = false;
     } finally {
-      btn.disabled = false;
+      btn.disabled = false; window.attendanceIsDirty = false;
     }
   }
   window.generateQR = generateQR;
@@ -882,8 +882,8 @@
 
   /* ── Load students for manual attendance ── */
   async function loadStudents() {
-    const course_id = document.getElementById('manCourseSelect').value;
-    if (!course_id) { document.getElementById('manStudentCard').style.display = 'none'; return; }
+    const assignment_id = document.getElementById('manCourseSelect').value;
+    if (!assignment_id) { document.getElementById('manStudentCard').style.display = 'none'; return; }
 
     document.getElementById('manStudentCard').style.display = '';
     const sel = document.getElementById('manCourseSelect');
@@ -964,8 +964,8 @@
   }
 
   async function submitAttendance() {
-    const course_id = document.getElementById('manCourseSelect').value;
-    if (!course_id) { SAMS.toast('Please select a course.', 'error'); return; }
+    const assignment_id = document.getElementById('manCourseSelect').value;
+    if (!assignment_id) { SAMS.toast('Please select a course.', 'error'); return; }
 
     const records = [];
     document.querySelectorAll('#studentList input[type="checkbox"]').forEach(cb => {
@@ -980,7 +980,7 @@
     try {
       const res  = await SAMS.apiFetch('/api/faculty/mark-attendance', {
         method: 'POST',
-        body: JSON.stringify({ course_id: parseInt(course_id), records, date: new Date().toISOString().split('T')[0] })
+        body: JSON.stringify({ assignment_id: parseInt(assignment_id), records, date: new Date().toISOString().split('T')[0] })
       });
       const data = await res.json();
       const notice = document.getElementById('manNotice');
@@ -995,7 +995,7 @@
     } catch {
       SAMS.toast('Network error.', 'error');
     } finally {
-      btn.disabled = false;
+      btn.disabled = false; window.attendanceIsDirty = false;
     }
   }
   window.submitAttendance = submitAttendance;
@@ -1078,7 +1078,7 @@
 
   /* ── Past Sessions ── */
   async function loadPastSessions(silent = false) {
-    const courseId = document.getElementById('sessionCourseSelect').value;
+    const assignmentId = document.getElementById('sessionCourseSelect').value;
     const listCard = document.getElementById('sessionsListCard');
     const detailsCard = document.getElementById('sessionDetailsCard');
     const container = document.getElementById('sessionsListContainer');
@@ -1086,7 +1086,7 @@
     if (!silent) {
       detailsCard.style.display = 'none';
     }
-    if (!courseId) {
+    if (!assignmentId) {
       listCard.style.display = 'none';
       return;
     }
@@ -1131,20 +1131,21 @@
     }
   }
 
-  async function loadSessionAttendance(sessionId) {
+  async function loadSessionAttendance(sessionId, silent=false) {
     currentSessionId = sessionId;
     document.getElementById('sessionsListCard').style.display = 'none';
     document.getElementById('sessionDetailsCard').style.display = 'block';
     const container = document.getElementById('sessionStudentList');
-    container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading attendance...</p></div>`;
+    if (!silent) container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading attendance...</p></div>`;
+    window.attendanceIsDirty = false;
     
     try {
       const res = await SAMS.apiFetch(`/api/faculty/sessions/${sessionId}/attendance`);
-      const records = await res.json();
+      let records = await res.json(); if (!Array.isArray(records)) records = [];
       sessionStudentData = records;
       renderSessionStudentList(records);
     } catch {
-      container.innerHTML = `<div class="empty-state"><p>Could not load session attendance.</p></div>`;
+      if (!silent) container.innerHTML = `<div class="empty-state"><p>Could not load session attendance.</p></div>`;
     }
   }
 
@@ -1164,7 +1165,7 @@
       if (isPresent) present++; else absent++;
       return `
         <label class="chk-item">
-          <input type="checkbox" id="sess_stu_${i}" ${isPresent ? 'checked' : ''}>
+          <input type="checkbox" id="sess_stu_${i}" ${isPresent ? 'checked' : ''} onchange="window.attendanceIsDirty = true;">
           <div>
             <div class="chk-name">${escHtml(r.name)}</div>
             <div class="chk-roll">${escHtml(r.roll_number)}</div>
@@ -1230,7 +1231,7 @@
       notice.textContent = 'Network error.';
       notice.className = 'notice show error';
     } finally {
-      btn.disabled = false;
+      btn.disabled = false; window.attendanceIsDirty = false;
     }
   }
   window.loadPastSessions = loadPastSessions;

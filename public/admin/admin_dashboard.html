@@ -1310,7 +1310,9 @@
           <td data-label="Role"><span class="badge badge-muted">${escHtml(r.role||'—')}</span></td>
           <td data-label="Action"><span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--primary);">${escHtml(r.action)}</span></td>
           <td data-label="Entity">${r.entity_type ? `<span class="badge badge-info">${escHtml(r.entity_type)} ${r.entity_id||''}</span>` : '—'}</td>
-          <td data-label="Details" style="font-size:0.75rem;color:var(--text-3);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(formatAuditDetail(r.detail))}</td>
+          <td data-label="Details" style="font-size:0.75rem;color:var(--text-3);max-width:200px;white-space:nowrap;">
+            ${r.detail ? `<button class="btn btn-ghost btn-sm" onclick="viewAuditDetail('${encodeURIComponent(JSON.stringify(r.detail))}')">View</button>` : '—'}
+          </td>
         </tr>`;
       }).join('');
       document.getElementById('auditMeta').textContent = `${rows.length} of ${data.total} entries`;

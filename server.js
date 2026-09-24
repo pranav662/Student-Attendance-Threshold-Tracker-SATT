@@ -712,7 +712,10 @@ app.put('/api/admin/settings', authenticate, requireRole('admin'), async (req, r
 app.post('/api/qr/generate', authenticate, requireRole('faculty'), async (req, res, next) => {
   const connection = await pool.getConnection();
   try {
-    const courseId = integerValue(req.body.course_id, 'Course ID', 1);
+    let assignmentId = parseInt(req.body.assignment_id);
+    let courseId = parseInt(req.body.course_id);
+
+    if (!assignmentId && !courseId) return fail(res, 400, 'assignment_id or course_id is required');
 
     const maxConfigMinutes = await getQRMaxDuration();
     const rawMinutes = parseFloat(req.body.duration_minutes) || maxConfigMinutes;
@@ -721,18 +724,34 @@ app.post('/api/qr/generate', authenticate, requireRole('faculty'), async (req, r
     const durationMs = rawMinutes * 60_000;
 
     await connection.beginTransaction();
-    const [assignments] = await connection.execute(
-      `SELECT f.faculty_id, fa.semester FROM faculty f
-       JOIN faculty_assignments fa ON fa.faculty_id = f.faculty_id
-       WHERE f.user_id = ? AND fa.course_id = ?`,
-      [req.user.sub, courseId]
-    );
-    if (!assignments[0]) { await connection.rollback(); return fail(res, 403, 'You are not assigned to this course.'); }
+    let assignments = [];
+    if (assignmentId) {
+      const [resAssignments] = await connection.execute(
+        `SELECT f.faculty_id, fa.assignment_id, fa.course_id, fa.semester FROM faculty f
+         JOIN faculty_assignments fa ON fa.faculty_id = f.faculty_id
+         WHERE f.user_id = ? AND fa.assignment_id = ?`,
+        [req.user.sub, assignmentId]
+      );
+      assignments = resAssignments;
+    } else {
+      const [resAssignments] = await connection.execute(
+        `SELECT f.faculty_id, fa.assignment_id, fa.course_id, fa.semester FROM faculty f
+         JOIN faculty_assignments fa ON fa.faculty_id = f.faculty_id
+         WHERE f.user_id = ? AND fa.course_id = ?`,
+        [req.user.sub, courseId]
+      );
+      assignments = resAssignments;
+    }
+
+    if (assignments.length === 0) { await connection.rollback(); return fail(res, 403, 'You are not assigned to this course.'); }
+    if (assignments.length > 1) { await connection.rollback(); return fail(res, 400, 'Ambiguous assignment: multiple semesters found. Please provide assignment_id.'); }
+    
+    const assignment = assignments[0];
 
     await connection.execute('DELETE FROM qr_tokens WHERE expires_at <= NOW()');
     const [session] = await connection.execute(
       'INSERT INTO sessions (course_id, faculty_id, semester, session_date, start_time) VALUES (?, ?, ?, CURDATE(), CURTIME())',
-      [courseId, assignments[0].faculty_id, assignments[0].semester]
+      [assignment.course_id, assignment.faculty_id, assignment.semester]
     );
     const token     = crypto.randomBytes(6).toString('hex').toUpperCase();
     const expiresAt = new Date(Date.now() + durationMs);
@@ -742,8 +761,8 @@ app.post('/api/qr/generate', authenticate, requireRole('faculty'), async (req, r
     );
     await connection.commit();
 
-    auditLog(req.user.sub, 'faculty', 'GENERATE_QR', 'session', session.insertId, { courseId, durationMs });
-    return res.status(201).json({ token, session_id: session.insertId, expires_at: expiresAt.toISOString() });
+    auditLog(req.user.sub, 'faculty', 'GENERATE_QR', 'session', session.insertId, { assignment_id: assignment.assignment_id, course_id: assignment.course_id, semester: assignment.semester });
+    return res.status(201).json({ token, session_id: session.insertId, assignment_id: assignment.assignment_id, course_id: assignment.course_id, semester: assignment.semester, expires_at: expiresAt.toISOString() });
   } catch (error) {
     await connection.rollback();
     return error.message ? fail(res, 400, error.message) : next(error);
@@ -926,7 +945,7 @@ app.post('/api/student/enroll-course', authenticate, requireRole('student'), asy
 app.get('/api/faculty/courses', authenticate, requireRole('faculty'), async (req, res, next) => {
   try {
     const [courses] = await pool.execute(
-      `SELECT c.course_id, c.course_code, c.course_name, fa.semester
+      `SELECT c.course_id, c.course_code, c.course_name, fa.semester, fa.assignment_id
        FROM faculty f
        JOIN faculty_assignments fa ON fa.faculty_id = f.faculty_id
        JOIN courses c ON c.course_id = fa.course_id
@@ -1092,29 +1111,43 @@ app.put('/api/faculty/students/:id', authenticate, requireRole('faculty'), async
 app.post('/api/faculty/mark-attendance', authenticate, requireRole('faculty'), async (req, res, next) => {
   const connection = await pool.getConnection();
   try {
-    const { course_id, records, date } = req.body;
-    if (!course_id || !records || !Array.isArray(records)) return fail(res, 400, 'Invalid data format.');
+    let assignmentId = parseInt(req.body.assignment_id);
+    let courseId = parseInt(req.body.course_id);
+    const { records, date } = req.body;
+    
+    if ((!assignmentId && !courseId) || !records || !Array.isArray(records)) return fail(res, 400, 'Invalid data format.');
+    
     const [faculties] = await connection.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
     if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
     const facultyId = faculties[0].faculty_id;
     
-    const [assignment] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, course_id]);
-    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+    let assignments = [];
+    if (assignmentId) {
+      const [resAssignments] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND assignment_id = ?', [facultyId, assignmentId]);
+      assignments = resAssignments;
+    } else {
+      const [resAssignments] = await connection.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+      assignments = resAssignments;
+    }
+
+    if (!assignments.length) return fail(res, 403, 'Unauthorized. Not assigned to this course/assignment.');
+    if (assignments.length > 1) return fail(res, 400, 'Ambiguous assignment. Please provide assignment_id.');
+    const assignment = assignments[0];
 
     await connection.beginTransaction();
     const [session] = await connection.execute(
       'INSERT INTO sessions (course_id, faculty_id, session_date, start_time, semester) VALUES (?, ?, ?, CURTIME(), ?)',
-      [course_id, facultyId, date || new Date().toISOString().split('T')[0], assignment[0].semester]
+      [assignment.course_id, facultyId, date || new Date().toISOString().split('T')[0], assignment.semester]
     );
     for (const record of records) {
       if (!record.student_id) continue;
       
-      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ? AND semester = ?', [record.student_id, course_id, assignment[0].semester]);
+      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ? AND semester = ?', [record.student_id, assignment.course_id, assignment.semester]);
       if (!enroll.length) continue;
 
       const status = record.status === 'Absent' ? 'Absent' : 'Present';
       await connection.execute(
-        'INSERT INTO attendance_records (session_id, student_id, status) VALUES (?, ?, ?)',
+        'INSERT INTO attendance_records (session_id, student_id, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status=VALUES(status)',
         [session.insertId, record.student_id, status]
       );
     }
@@ -1129,25 +1162,44 @@ app.post('/api/faculty/mark-attendance', authenticate, requireRole('faculty'), a
 /* ── View Past Sessions ── */
 app.get('/api/faculty/sessions', authenticate, requireRole('faculty'), async (req, res, next) => {
   try {
-    const courseId = parseInt(req.query.course_id);
-    if (!courseId) return fail(res, 400, 'Course ID required.');
+    let assignmentId = parseInt(req.query.assignment_id);
+    let courseId = parseInt(req.query.course_id);
+    if (!assignmentId && !courseId) return fail(res, 400, 'assignment_id or course_id required.');
     
     const [faculties] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
     if (!faculties[0]) return fail(res, 404, 'Faculty not found.');
     const facultyId = faculties[0].faculty_id;
 
-    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
-    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+    let assignments = [];
+    if (assignmentId) {
+      const [resAssignments] = await pool.execute(
+        'SELECT * FROM faculty_assignments WHERE faculty_id = ? AND assignment_id = ?',
+        [facultyId, assignmentId]
+      );
+      assignments = resAssignments;
+    } else {
+      const [resAssignments] = await pool.execute(
+        'SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?',
+        [facultyId, courseId]
+      );
+      assignments = resAssignments;
+    }
+
+    if (assignments.length === 0) return fail(res, 403, 'Unauthorized. Not assigned to this course/assignment.');
+    if (assignments.length > 1) return fail(res, 400, 'Ambiguous assignment. Please provide assignment_id.');
+    const assignment = assignments[0];
 
     const [sessions] = await pool.execute(
       `SELECT s.session_id, s.session_date, s.start_time,
-              (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = s.session_id AND ar.status = 'Present') AS present_count,
-              (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = s.course_id AND e.semester = s.semester) AS total_students
+              COUNT(DISTINCT e.student_id) AS total_students,
+              COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN e.student_id END) AS present_count
        FROM sessions s
-       JOIN faculty_assignments fa ON s.course_id = fa.course_id AND s.semester = fa.semester
-       WHERE s.course_id = ? AND s.faculty_id = ? AND fa.faculty_id = ?
+       JOIN enrollments e ON e.course_id = s.course_id AND e.semester = s.semester
+       LEFT JOIN attendance_records ar ON ar.session_id = s.session_id AND ar.student_id = e.student_id
+       WHERE s.course_id = ? AND s.faculty_id = ? AND s.semester = ?
+       GROUP BY s.session_id, s.session_date, s.start_time
        ORDER BY s.session_date DESC, s.start_time DESC`,
-      [courseId, facultyId, facultyId]
+      [assignment.course_id, facultyId, assignment.semester]
     );
     const results = sessions.map(s => {
       const total = Number(s.total_students) || 0;
@@ -1261,15 +1313,28 @@ app.put('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
 /* ── Faculty report ── */
 app.get('/api/faculty/report/pdf', authenticate, requireRole('faculty'), async (req, res, next) => {
   try {
-    const courseId = parseInt(req.query.course_id);
-    if (!courseId) return fail(res, 400, 'Course ID required.');
+    let assignmentId = parseInt(req.query.assignment_id);
+    let courseId = parseInt(req.query.course_id);
+    if (!assignmentId && !courseId) return fail(res, 400, 'assignment_id or course_id required.');
 
     const [faculty] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
     if (!faculty[0]) return fail(res, 404, 'Faculty not found.');
+    const facultyId = faculty[0].faculty_id;
     
-    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [faculty[0].faculty_id, courseId]);
-    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
-    const semester = assignment[0].semester;
+    let assignments = [];
+    if (assignmentId) {
+      const [resAssignments] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND assignment_id = ?', [facultyId, assignmentId]);
+      assignments = resAssignments;
+    } else {
+      const [resAssignments] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [facultyId, courseId]);
+      assignments = resAssignments;
+    }
+
+    if (!assignments.length) return fail(res, 403, 'Unauthorized. Not assigned to this course/assignment.');
+    if (assignments.length > 1) return fail(res, 400, 'Ambiguous assignment. Please provide assignment_id.');
+    const assignment = assignments[0];
+    const semester = assignment.semester;
+    courseId = assignment.course_id;
 
     const threshold = await getAttendanceThreshold();
 
