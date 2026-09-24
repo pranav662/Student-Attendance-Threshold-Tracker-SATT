@@ -136,6 +136,15 @@ async function getAttendanceThreshold() {
   return ATTENDANCE_THRESHOLD;
 }
 
+async function getQRMaxDuration() {
+  try {
+    const [rows] = await pool.execute("SELECT setting_value FROM system_settings WHERE setting_key = 'qr_max_duration' LIMIT 1");
+    const val = parseInt(rows[0]?.setting_value);
+    if (!isNaN(val) && val > 0 && val <= 300) return val;
+  } catch {}
+  return 10;
+}
+
 function calcThreshold(attended, total, threshold = ATTENDANCE_THRESHOLD) {
   attended = Number(attended) || 0;
   total = Number(total) || 0;
@@ -342,7 +351,7 @@ app.get('/api/admin/students', authenticate, requireRole('admin'), async (req, r
               (SELECT COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END)
                FROM attendance_records ar WHERE ar.student_id = s.student_id) AS attended_classes,
               (SELECT COUNT(DISTINCT se.session_id) FROM sessions se
-               JOIN enrollments e ON e.course_id = se.course_id WHERE e.student_id = s.student_id) AS total_classes
+               JOIN enrollments e ON e.course_id = se.course_id AND e.semester = se.semester WHERE e.student_id = s.student_id) AS total_classes
        FROM students s JOIN users u ON u.user_id = s.user_id
        ${whereClause}
        ORDER BY s.name LIMIT ${limit} OFFSET ${offset}`,
@@ -541,7 +550,7 @@ app.get('/api/admin/at-risk-students', authenticate, requireRole('admin'), async
       SELECT s.student_id, s.name, s.roll_number, s.batch_year, u.email,
         COUNT(DISTINCT CASE WHEN ar.status = 'Present' THEN ar.record_id END) AS attended,
         (SELECT COUNT(DISTINCT se.session_id) FROM sessions se
-         JOIN enrollments e2 ON e2.course_id = se.course_id WHERE e2.student_id = s.student_id) AS total
+         JOIN enrollments e2 ON e2.course_id = se.course_id AND e2.semester = se.semester WHERE e2.student_id = s.student_id) AS total
       FROM students s
       JOIN users u ON u.user_id = s.user_id
       LEFT JOIN attendance_records ar ON ar.student_id = s.student_id
@@ -586,7 +595,7 @@ app.get('/api/admin/attendance-monitoring', authenticate, requireRole('admin'), 
        FROM students s
        JOIN enrollments e ON e.student_id = s.student_id
        JOIN courses c ON c.course_id = e.course_id
-       LEFT JOIN sessions se ON se.course_id = c.course_id
+       LEFT JOIN sessions se ON se.course_id = c.course_id AND se.semester = e.semester
        LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
        ${whereStr}
        GROUP BY s.student_id, s.name, s.roll_number, c.course_id, c.course_code, c.course_name
@@ -676,16 +685,15 @@ app.post('/api/qr/generate', authenticate, requireRole('faculty'), async (req, r
   try {
     const courseId = integerValue(req.body.course_id, 'Course ID', 1);
 
-    // Duration: default 10 minutes, min 10s (0.167min), max 60 minutes
-    const rawMinutes = parseFloat(req.body.duration_minutes) || 10;
-    const durationMs = Math.min(
-      60 * 60_000,              // 60 minutes max
-      Math.max(10_000, rawMinutes * 60_000)  // 10 seconds min
-    );
+    const maxConfigMinutes = await getQRMaxDuration();
+    const rawMinutes = parseFloat(req.body.duration_minutes) || maxConfigMinutes;
+    if (rawMinutes > maxConfigMinutes) return fail(res, 400, `QR session duration cannot exceed ${maxConfigMinutes} minutes.`);
+    if (rawMinutes <= 0) return fail(res, 400, 'Duration must be greater than 0.');
+    const durationMs = rawMinutes * 60_000;
 
     await connection.beginTransaction();
     const [assignments] = await connection.execute(
-      `SELECT f.faculty_id FROM faculty f
+      `SELECT f.faculty_id, fa.semester FROM faculty f
        JOIN faculty_assignments fa ON fa.faculty_id = f.faculty_id
        WHERE f.user_id = ? AND fa.course_id = ?`,
       [req.user.sub, courseId]
@@ -694,8 +702,8 @@ app.post('/api/qr/generate', authenticate, requireRole('faculty'), async (req, r
 
     await connection.execute('DELETE FROM qr_tokens WHERE expires_at <= NOW()');
     const [session] = await connection.execute(
-      'INSERT INTO sessions (course_id, faculty_id, session_date, start_time) VALUES (?, ?, CURDATE(), CURTIME())',
-      [courseId, assignments[0].faculty_id]
+      'INSERT INTO sessions (course_id, faculty_id, semester, session_date, start_time) VALUES (?, ?, ?, CURDATE(), CURTIME())',
+      [courseId, assignments[0].faculty_id, assignments[0].semester]
     );
     const token     = crypto.randomBytes(6).toString('hex').toUpperCase();
     const expiresAt = new Date(Date.now() + durationMs);
@@ -723,9 +731,9 @@ app.post('/api/qr/scan', authenticate, requireRole('student'), async (req, res, 
     if (!students[0]) { await connection.rollback(); return fail(res, 404, 'Student profile not found.'); }
     const [tokens] = await connection.execute('SELECT session_id FROM qr_tokens WHERE token = ? AND expires_at > NOW() FOR UPDATE', [token]);
     if (!tokens[0]) { await connection.rollback(); return fail(res, 400, 'This token is invalid or has expired.'); }
-    const [sessions] = await connection.execute('SELECT course_id FROM sessions WHERE session_id = ?', [tokens[0].session_id]);
-    const [enrollments] = await connection.execute('SELECT enrollment_id FROM enrollments WHERE student_id = ? AND course_id = ?', [students[0].student_id, sessions[0].course_id]);
-    if (!enrollments[0]) { await connection.rollback(); return fail(res, 403, 'You are not enrolled in this course.'); }
+    const [sessions] = await connection.execute('SELECT course_id, semester FROM sessions WHERE session_id = ?', [tokens[0].session_id]);
+    const [enrollments] = await connection.execute('SELECT enrollment_id FROM enrollments WHERE student_id = ? AND course_id = ? AND semester = ?', [students[0].student_id, sessions[0].course_id, sessions[0].semester]);
+    if (!enrollments[0]) { await connection.rollback(); return fail(res, 403, 'You are not enrolled in this course for this semester.'); }
     await connection.execute(
       `INSERT INTO attendance_records (session_id, student_id, status) VALUES (?, ?, 'Present')`,
       [tokens[0].session_id, students[0].student_id]
@@ -766,7 +774,7 @@ app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, 
               COUNT(DISTINCT se.session_id) AS total_classes
        FROM students s
        LEFT JOIN enrollments e ON e.student_id = s.student_id
-       LEFT JOIN sessions se ON se.course_id = e.course_id
+       LEFT JOIN sessions se ON se.course_id = e.course_id AND se.semester = e.semester
        LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
        WHERE s.user_id = ?
        GROUP BY s.student_id, s.name`,
@@ -786,7 +794,7 @@ app.get('/api/my-attendance', authenticate, requireRole('student'), async (req, 
        FROM students s
        JOIN enrollments e ON e.student_id = s.student_id
        JOIN courses c ON c.course_id = e.course_id
-       LEFT JOIN sessions se ON se.course_id = c.course_id
+       LEFT JOIN sessions se ON se.course_id = c.course_id AND se.semester = e.semester
        LEFT JOIN attendance_records ar ON ar.session_id = se.session_id AND ar.student_id = s.student_id
        WHERE s.user_id = ?
        GROUP BY c.course_id, c.course_code, c.course_name
@@ -1205,6 +1213,13 @@ app.get('/api/faculty/report/pdf', authenticate, requireRole('faculty'), async (
   try {
     const courseId = parseInt(req.query.course_id);
     if (!courseId) return fail(res, 400, 'Course ID required.');
+
+    const [faculty] = await pool.execute('SELECT faculty_id FROM faculty WHERE user_id = ?', [req.user.sub]);
+    if (!faculty[0]) return fail(res, 404, 'Faculty not found.');
+    
+    const [assignment] = await pool.execute('SELECT * FROM faculty_assignments WHERE faculty_id = ? AND course_id = ?', [faculty[0].faculty_id, courseId]);
+    if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
+
     const [courseInfo] = await pool.execute('SELECT course_code, course_name FROM courses WHERE course_id = ?', [courseId]);
     if (!courseInfo[0]) return fail(res, 404, 'Course not found.');
     const [students] = await pool.execute(
@@ -1278,9 +1293,9 @@ app.get('/api/faculty/report/pdf', authenticate, requireRole('faculty'), async (
         drawRow({}, true);
       }
       const total = Number(s.total), att = Number(s.attended);
-      const pct = total > 0 ? ((att / total) * 100).toFixed(1) : 0;
-      const status = pct >= 85 ? 'Safe' : pct >= 75 ? 'Near Threshold' : pct >= 60 ? 'At Risk' : total === 0 ? 'No Data' : 'Critical';
-      drawRow({ roll: s.roll_number, name: s.name, total, attended: att, absent: total - att, pct, status, _row: i }, false);
+      const thr = calcThreshold(att, total, threshold);
+      const statusLabels = { safe: 'Safe', near_threshold: 'Near Threshold', at_risk: 'At Risk', critical: 'Critical', no_classes: 'No Data' };
+      drawRow({ roll: s.roll_number, name: s.name, total, attended: att, absent: total - att, pct: thr.percentage, status: statusLabels[thr.status] || 'No Data', _row: i }, false);
     });
 
     // Footer
@@ -1619,6 +1634,28 @@ app.put('/api/profile/password', authenticate, async (req, res, next) => {
 app.post('/api/profile/upload-pic', authenticate, upload.single('profile_pic'), async (req, res, next) => {
   try {
     if (!req.file) return fail(res, 400, 'No image file received.');
+    
+    // Check magic bytes
+    const buffer = fs.readFileSync(req.file.path);
+    const magic = buffer.toString('hex', 0, 4).toUpperCase();
+    let isImage = false;
+    if (magic.startsWith('FFD8FF')) isImage = true; // JPEG
+    else if (magic.startsWith('89504E47')) isImage = true; // PNG
+    else if (magic.startsWith('47494638')) isImage = true; // GIF
+    else if (magic.startsWith('52494646')) isImage = true; // WEBP
+
+    if (!isImage) {
+      fs.unlinkSync(req.file.path);
+      return fail(res, 400, 'Invalid image file signature.');
+    }
+    
+    // Delete old pic
+    const [rows] = await pool.execute('SELECT profile_pic FROM users WHERE user_id = ?', [req.user.sub]);
+    if (rows[0] && rows[0].profile_pic) {
+      const oldPath = path.join(__dirname, 'public', rows[0].profile_pic);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
     const picUrl = '/uploads/' + req.file.filename;
     await pool.execute('UPDATE users SET profile_pic = ? WHERE user_id = ?', [picUrl, req.user.sub]);
     res.json({ message: 'Profile picture updated.', profile_pic: picUrl });

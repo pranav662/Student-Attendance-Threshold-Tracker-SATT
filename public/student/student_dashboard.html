@@ -7,6 +7,7 @@
   <meta name="description" content="Student attendance dashboard — view your attendance, courses, and threshold status.">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://unpkg.com/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script>
     (function() {
       var saved = localStorage.getItem('sams_theme');
@@ -345,7 +346,7 @@
         <div class="page-head">
           <div class="eyebrow">Attendance</div>
           <h1>Mark Your Attendance</h1>
-          <p>Enter the 6-character QR token displayed by your faculty.</p>
+          <p>Enter the 12-character QR token displayed by your faculty.</p>
         </div>
 
         <div class="g2" style="max-width:680px;">
@@ -361,9 +362,9 @@
             <form id="scanForm" style="max-width:320px;">
               <div class="form-group">
                 <label class="form-label" for="qrTokenInput">Session Token</label>
-                <input class="form-input scan-field" id="qrTokenInput" maxlength="6"
-                  placeholder="ABC123" autocomplete="off" autocorrect="off" spellcheck="false" required>
-                <div class="form-hint">6-character token shown on the faculty's screen</div>
+                <input class="form-input scan-field" id="qrTokenInput" maxlength="12"
+                  placeholder="ABCDEF123456" autocomplete="off" autocorrect="off" spellcheck="false" required>
+                <div class="form-hint">12-character token shown on the faculty's screen</div>
               </div>
               <div style="display:flex;gap:0.625rem;">
                 <button type="submit" class="btn btn-primary" id="scanBtn">
@@ -456,10 +457,10 @@
 
 <!-- QR camera scanner overlay -->
 <div class="scanner-overlay" id="scannerOverlay">
-  <div class="scanner-box">
+  <div class="scanner-box" style="background:var(--bg-card); padding:1rem; border-radius:var(--r-lg);">
     <h2>Scan QR Code</h2>
     <p>Point your camera at the QR code shown by your faculty.</p>
-    <video id="qrVideo" autoplay muted playsinline style="border-radius:var(--r-md);background:#000;"></video>
+    <div id="qr-reader" style="width:100%; border-radius:var(--r-md); overflow:hidden;"></div>
     <button class="btn btn-ghost btn-full" style="margin-top:0.875rem;" onclick="closeScanner()">Cancel</button>
   </div>
 </div>
@@ -937,22 +938,31 @@
   });
 
   /* ── QR camera scanner ── */
-  let qrStream = null;
-  async function openScanner() {
+  let html5QrcodeScanner = null;
+  function openScanner() {
     const overlay = document.getElementById('scannerOverlay');
     overlay.classList.add('show');
-    try {
-      qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      document.getElementById('qrVideo').srcObject = qrStream;
-    } catch {
-      SAMS.toast('Camera access denied or not available.', 'error');
-      closeScanner();
+    if (!html5QrcodeScanner) {
+      html5QrcodeScanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true },
+        false
+      );
+      html5QrcodeScanner.render((decodedText) => {
+        document.getElementById('qrTokenInput').value = decodedText.trim().toUpperCase();
+        closeScanner();
+        document.getElementById('scanBtn').click();
+      }, (errorMessage) => {
+        // Ignored.
+      });
     }
   }
   function closeScanner() {
     document.getElementById('scannerOverlay').classList.remove('show');
-    if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
-    document.getElementById('qrVideo').srcObject = null;
+    if (html5QrcodeScanner) {
+      html5QrcodeScanner.clear().catch(e => console.error(e));
+      html5QrcodeScanner = null;
+    }
   }
   window.openScanner  = openScanner;
   window.closeScanner = closeScanner;

@@ -56,7 +56,8 @@ CREATE TABLE faculty_assignments (
     course_id INT NOT NULL,
     semester VARCHAR(50) NOT NULL,
     FOREIGN KEY (faculty_id) REFERENCES faculty (faculty_id) ON DELETE CASCADE,
-    FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE
+    FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE,
+    UNIQUE (faculty_id, course_id, semester)
 );
 
 CREATE TABLE enrollments (
@@ -65,7 +66,8 @@ CREATE TABLE enrollments (
     course_id INT NOT NULL,
     semester VARCHAR(50) NOT NULL,
     FOREIGN KEY (student_id) REFERENCES students (student_id) ON DELETE CASCADE,
-    FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE
+    FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE,
+    UNIQUE (student_id, course_id, semester)
 );
 
 -- III. Core Attendance Engine
@@ -73,6 +75,7 @@ CREATE TABLE sessions (
     session_id INT AUTO_INCREMENT PRIMARY KEY,
     course_id INT NOT NULL,
     faculty_id INT NOT NULL,
+    semester VARCHAR(50) NOT NULL,
     session_date DATE NOT NULL,
     start_time TIME NOT NULL,
     FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE,

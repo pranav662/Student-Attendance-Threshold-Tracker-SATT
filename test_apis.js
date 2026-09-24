@@ -150,6 +150,10 @@ async function run() {
   const facSessAttn = await req('/api/faculty/sessions/99999/attendance', null, 'GET', facToken);
   check('Faculty /sessions/:id/attendance (403/200)', facSessAttn.status === 403 || facSessAttn.status === 200);
 
+  // 20d. Unauthorized faculty access (Negative Test)
+  const unauthFac = await req('/api/faculty/students?course_id=99999', null, 'GET', facToken);
+  check('Faculty unauthorized course access (403)', unauthFac.status === 403);
+
   console.log('\n── PDF ───────────────────────────────────────────');
 
   // 21. Student PDF (status code only, skip body)
@@ -163,6 +167,16 @@ async function run() {
   });
   check('Student PDF (200)', pdf.status === 200, `content-type: ${pdf.ct}`);
   check('Student PDF content-type', pdf.ct.includes('application/pdf'));
+
+  // 22. Faculty PDF (Unauthorized Test)
+  const facPdf = await new Promise((resolve) => {
+    const r = http.get({ hostname:'localhost', port:3000, path:'/api/faculty/report/pdf?course_id=99999&token=' + facToken }, res => {
+      resolve({ status: res.statusCode });
+      res.destroy();
+    });
+    r.on('error', e => resolve({ status: -1 }));
+  });
+  check('Faculty PDF Unauthorized (403)', facPdf.status === 403);
 
   console.log(`\n────────────────────────────────────────────────`);
   console.log(`RESULTS: ${pass} passed, ${fail} failed`);
