@@ -362,6 +362,7 @@
           <div class="card" id="sessionsListCard" style="display:none; margin-bottom:1rem;">
             <div class="section-head" style="margin-bottom:0.875rem;">
               <div class="card-title">Past Sessions</div>
+              <button class="btn btn-ghost btn-sm" onclick="loadPastSessions()"><i data-lucide="refresh-cw"></i> Refresh</button>
             </div>
             <div id="sessionsListContainer">
               <div class="empty-state"><div class="ei">📅</div><p>Loading sessions...</p></div>
@@ -469,7 +470,7 @@
 </div>
 
 <!-- Edit Student Modal -->
-<div class="modal" id="modalEditStudent">
+<div class="modal" id="modalEditStudent" style="z-index:100000;">
   <div class="modal-content" style="max-width:400px;">
     <div class="modal-header">
       <h2 class="modal-title">Edit Student</h2>
@@ -557,6 +558,15 @@
     if (name === 'courses') loadMyCourses();
     if (name === 'assign')  loadAssignableCourses();
     if (name === 'students') loadStudentsTab();
+    if (name === 'sessions') {
+      const select = document.getElementById('sessionCourseSelect');
+      if (select && select.options.length <= 1) {
+        // Will populate list, but wait, loadPastSessions needs the course select to be populated.
+        // It's populated on load by loadAllFacultyCourses() maybe? 
+        // We can just call loadPastSessions() which checks if courseId exists.
+      }
+      loadPastSessions();
+    }
   }
   window.gotoSection = gotoSection;
 
@@ -1073,17 +1083,25 @@
       
       container.innerHTML = sessions.map(s => {
         const dt = new Date(s.session_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        const pct = s.total_students > 0 ? ((s.present_count / s.total_students) * 100).toFixed(1) : '0.0';
         return `
           <div class="course-row" style="padding:0.75rem 1.25rem;">
             <div class="course-dot"></div>
             <div style="flex:1;min-width:0;">
               <div style="font-weight:600;font-size:0.875rem;color:var(--text-1);">${dt}</div>
               <div style="font-size:0.75rem;color:var(--text-3);font-family:var(--font-mono);">Started at: ${s.start_time}</div>
+              <div style="font-size:0.75rem;color:var(--text-2);margin-top:0.25rem;display:flex;gap:0.75rem;align-items:center;">
+                <span style="color:var(--success);font-weight:600;"><i data-lucide="user-check" style="width:12px;height:12px;display:inline-block;margin-right:2px;"></i>${s.present_count} Present</span>
+                <span style="color:var(--danger);"><i data-lucide="user-minus" style="width:12px;height:12px;display:inline-block;margin-right:2px;"></i>${s.absent_count} Absent</span>
+                <span>${s.total_students} Total</span>
+                <strong style="margin-left:auto;">${pct}% Attendance</strong>
+              </div>
             </div>
             <button class="btn btn-ghost btn-sm" onclick="loadSessionAttendance(${s.session_id})">View / Edit</button>
           </div>
         `;
       }).join('');
+      lucide.createIcons();
     } catch {
       container.innerHTML = `<div class="empty-state"><p>Could not load sessions.</p></div>`;
     }

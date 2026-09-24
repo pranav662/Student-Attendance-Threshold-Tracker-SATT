@@ -465,6 +465,35 @@ app.post('/api/admin/departments', authenticate, requireRole('admin'), async (re
   }
 });
 
+app.put('/api/admin/departments/:id', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const deptId = parseInt(req.params.id);
+    const dept_name = stringValue(req.body.dept_name);
+    const dept_code = stringValue(req.body.dept_code).toUpperCase();
+    if (!dept_name || dept_name.length < 2) return fail(res, 400, 'Department name is required.');
+    if (!dept_code || dept_code.length < 2) return fail(res, 400, 'Department code is required.');
+    const [result] = await pool.execute('UPDATE departments SET dept_name = ?, dept_code = ? WHERE dept_id = ?', [dept_name, dept_code, deptId]);
+    if (!result.affectedRows) return fail(res, 404, 'Department not found.');
+    auditLog(req.user.sub, 'admin', 'UPDATE_DEPT', 'department', deptId, { dept_name, dept_code });
+    return res.json({ message: 'Department updated successfully.' });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') return fail(res, 409, 'A department with that code already exists.');
+    return next(error);
+  }
+});
+
+app.delete('/api/admin/departments/:id', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const deptId = parseInt(req.params.id);
+    const [courses] = await pool.execute('SELECT COUNT(*) AS count FROM courses WHERE dept_id = ?', [deptId]);
+    if (courses[0].count > 0) return fail(res, 409, 'Cannot delete this department because it contains courses. Move or remove the courses first.');
+    const [result] = await pool.execute('DELETE FROM departments WHERE dept_id = ?', [deptId]);
+    if (!result.affectedRows) return fail(res, 404, 'Department not found.');
+    auditLog(req.user.sub, 'admin', 'DELETE_DEPT', 'department', deptId);
+    return res.json({ message: 'Department deleted successfully.' });
+  } catch (error) { return next(error); }
+});
+
 /* ── Courses ── */
 app.get('/api/admin/courses', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
@@ -623,7 +652,7 @@ app.get('/api/admin/audit-logs', authenticate, requireRole('admin'), async (req,
 
     const [[{ total }]] = await pool.execute(
       `SELECT COUNT(*) AS total FROM audit_log al ${where}`, params
-    ).catch(() => [[{ total: 0 }]]);
+    );
 
     const [rows] = await pool.execute(
       `SELECT al.log_id, al.user_id, al.role, al.action, al.entity_type, al.entity_id, al.detail, al.created_at,
@@ -635,7 +664,7 @@ app.get('/api/admin/audit-logs', authenticate, requireRole('admin'), async (req,
        ${where}
        ORDER BY al.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
       params
-    ).catch(() => [[]]);
+    );
 
     return res.json({ data: rows, total, page, limit, pages: Math.ceil(total / limit) });
   } catch (error) { return next(error); }
@@ -1040,7 +1069,7 @@ app.put('/api/faculty/students/:id', authenticate, requireRole('faculty'), async
     // Verify faculty teaches the student
     const [authCheck] = await pool.execute(
       `SELECT 1 FROM enrollments e
-       JOIN faculty_assignments fa ON e.course_id = fa.course_id
+       JOIN faculty_assignments fa ON e.course_id = fa.course_id AND e.semester = fa.semester
        WHERE e.student_id = ? AND fa.faculty_id = ? LIMIT 1`,
       [studentId, facultyId]
     );
@@ -1074,13 +1103,13 @@ app.post('/api/faculty/mark-attendance', authenticate, requireRole('faculty'), a
 
     await connection.beginTransaction();
     const [session] = await connection.execute(
-      'INSERT INTO sessions (course_id, faculty_id, session_date, start_time) VALUES (?, ?, ?, CURTIME())',
-      [course_id, facultyId, date || new Date().toISOString().split('T')[0]]
+      'INSERT INTO sessions (course_id, faculty_id, session_date, start_time, semester) VALUES (?, ?, ?, CURTIME(), ?)',
+      [course_id, facultyId, date || new Date().toISOString().split('T')[0], assignment[0].semester]
     );
     for (const record of records) {
       if (!record.student_id) continue;
       
-      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?', [record.student_id, course_id]);
+      const [enroll] = await connection.execute('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ? AND semester = ?', [record.student_id, course_id, assignment[0].semester]);
       if (!enroll.length) continue;
 
       const status = record.status === 'Absent' ? 'Absent' : 'Present';
@@ -1111,13 +1140,30 @@ app.get('/api/faculty/sessions', authenticate, requireRole('faculty'), async (re
     if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
 
     const [sessions] = await pool.execute(
-      `SELECT s.session_id, s.session_date, s.start_time 
+      `SELECT s.session_id, s.session_date, s.start_time,
+              COUNT(ar.record_id) AS present_count,
+              (SELECT COUNT(*) FROM enrollments e WHERE e.course_id = s.course_id AND e.semester = s.semester) AS total_students
        FROM sessions s
        JOIN faculty_assignments fa ON s.course_id = fa.course_id AND s.semester = fa.semester
-       WHERE s.course_id = ? AND s.faculty_id = ? AND fa.faculty_id = ? ORDER BY s.session_date DESC, s.start_time DESC`,
+       LEFT JOIN attendance_records ar ON ar.session_id = s.session_id AND ar.status = 'Present'
+       WHERE s.course_id = ? AND s.faculty_id = ? AND fa.faculty_id = ?
+       GROUP BY s.session_id, s.session_date, s.start_time, s.course_id, s.semester
+       ORDER BY s.session_date DESC, s.start_time DESC`,
       [courseId, facultyId, facultyId]
     );
-    return res.json(sessions);
+    const results = sessions.map(s => {
+      const total = Number(s.total_students) || 0;
+      const present = Number(s.present_count) || 0;
+      return {
+        session_id: s.session_id,
+        session_date: s.session_date,
+        start_time: s.start_time,
+        present_count: present,
+        absent_count: Math.max(0, total - present),
+        total_students: total
+      };
+    });
+    return res.json(results);
   } catch (error) { return next(error); }
 });
 
@@ -1138,11 +1184,12 @@ app.get('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
     if (!assignment.length) return fail(res, 403, 'Unauthorized. Not assigned to this course.');
 
     const [records] = await pool.execute(
-      `SELECT s.student_id, s.name, s.roll_number, ar.status 
-       FROM attendance_records ar
-       JOIN students s ON s.student_id = ar.student_id
-       WHERE ar.session_id = ? ORDER BY s.name`,
-      [sessionId]
+      `SELECT s.student_id, s.name, s.roll_number, COALESCE(ar.status, 'Absent') AS status 
+       FROM enrollments e
+       JOIN students s ON s.student_id = e.student_id
+       LEFT JOIN attendance_records ar ON ar.session_id = ? AND ar.student_id = e.student_id
+       WHERE e.course_id = ? AND e.semester = ? ORDER BY s.name`,
+      [sessionId, courseId, semester]
     );
     return res.json(records);
   } catch (error) { return next(error); }
@@ -1185,8 +1232,8 @@ app.put('/api/faculty/sessions/:session_id/attendance', authenticate, requireRol
       }
       
       await connection.execute(
-        'UPDATE attendance_records SET status = ? WHERE session_id = ? AND student_id = ?',
-        [status, sessionId, record.student_id]
+        'INSERT INTO attendance_records (session_id, student_id, status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE status = ?',
+        [sessionId, record.student_id, status, status]
       );
       
       if (reason && oldStatus !== status) {

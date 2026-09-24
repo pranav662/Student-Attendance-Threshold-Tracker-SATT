@@ -72,6 +72,18 @@ async function run() {
   const depts = await req('/api/admin/departments', null, 'GET', adminToken);
   check('Admin /departments (200)', depts.status === 200, JSON.stringify(depts.body));
 
+  console.log('\n── DEPARTMENT CRUD TEST ──────────────────────────');
+  const deptCreate = await req('/api/admin/departments', { dept_code: 'TESTDEPT', dept_name: 'Test Dept' }, 'POST', adminToken);
+  check('Admin POST /departments (201)', deptCreate.status === 201 || deptCreate.status === 409, JSON.stringify(deptCreate.body));
+  if (deptCreate.status === 201) {
+    const deptId = deptCreate.body.dept_id;
+    const deptEdit = await req(`/api/admin/departments/${deptId}`, { dept_code: 'TEST2', dept_name: 'Test Dept 2' }, 'PUT', adminToken);
+    check('Admin PUT /departments/:id (200)', deptEdit.status === 200, JSON.stringify(deptEdit.body));
+
+    const deptDelete = await req(`/api/admin/departments/${deptId}`, null, 'DELETE', adminToken);
+    check('Admin DELETE /departments/:id (200)', deptDelete.status === 200, JSON.stringify(deptDelete.body));
+  }
+
   // 8. Courses
   const courses = await req('/api/admin/courses', null, 'GET', adminToken);
   check('Admin /courses (200)', courses.status === 200, JSON.stringify(courses.body));
@@ -159,6 +171,9 @@ async function run() {
   // 20d. Unauthorized faculty access (Negative Test)
   const unauthFac = await req('/api/faculty/students?course_id=99999', null, 'GET', facToken);
   check('Faculty unauthorized course access (403)', unauthFac.status === 403);
+  
+  const editUnauthStu = await req('/api/faculty/students/99999', { name: 'Test', roll_number: '123', batch_year: 2024 }, 'PUT', facToken);
+  check('Faculty cross-course/semester student edit blocked (403)', editUnauthStu.status === 403 || editUnauthStu.status === 404);
 
   console.log('\n── PDF ───────────────────────────────────────────');
 

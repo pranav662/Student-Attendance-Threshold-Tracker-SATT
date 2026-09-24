@@ -411,10 +411,10 @@
             <div style="overflow-x:auto;">
               <table class="admin-table">
                 <thead>
-                  <tr><th>Code</th><th>Name</th><th>Courses</th><th>Students</th></tr>
+                  <tr><th>Code</th><th>Name</th><th>Courses</th><th>Students</th><th style="width:120px;">Actions</th></tr>
                 </thead>
                 <tbody id="deptsBody">
-                  <tr><td colspan="4"><div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div></td></tr>
+                  <tr><td colspan="5"><div class="empty-state"><div class="ei">⏳</div><p>Loading…</p></div></td></tr>
                 </tbody>
               </table>
             </div>
@@ -704,6 +704,27 @@
 </div>
 
 <!-- ── Confirm Modal ── -->
+<div class="modal-overlay" id="editDeptModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-title">Edit Department</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditDept()"><i data-lucide="x"></i></button>
+    </div>
+    <div style="margin-bottom:1rem;">
+      <label class="form-label" for="editDeptCode">Department Code</label>
+      <input type="text" id="editDeptCode" class="form-input" required maxlength="20">
+    </div>
+    <div style="margin-bottom:1.5rem;">
+      <label class="form-label" for="editDeptName">Department Name</label>
+      <input type="text" id="editDeptName" class="form-input" required>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+      <button class="btn btn-ghost" onclick="closeEditDept()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDeptEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-box" style="max-width:380px;">
     <div class="modal-head">
@@ -1094,7 +1115,7 @@
       const tbody = document.getElementById('deptsBody');
       if (!tbody) return;
       if (!allDepts.length) {
-        tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="ei">🏢</div><p>No departments found.</p></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="ei">🏢</div><p>No departments found.</p></div></td></tr>`;
         return;
       }
       tbody.innerHTML = allDepts.map(d => `<tr>
@@ -1102,7 +1123,14 @@
         <td data-label="Name">${escHtml(d.dept_name)}</td>
         <td data-label="Courses">${d.course_count}</td>
         <td data-label="Students">${d.student_count}</td>
+        <td data-label="Actions">
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-ghost btn-sm" onclick="openEditDept(${d.dept_id}, '${escHtml(d.dept_code)}', '${escHtml(d.dept_name)}')"><i data-lucide="edit-3"></i></button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteDepartment(${d.dept_id}, '${escHtml(d.dept_name)}')"><i data-lucide="trash-2"></i></button>
+          </div>
+        </td>
       </tr>`).join('');
+      lucide.createIcons();
     } catch { SAMS.toast('Could not load departments.', 'error'); }
   }
   window.loadDepartments = loadDepartments;
@@ -1126,6 +1154,55 @@
     } catch { showNotice(notice, 'Network error.', 'error'); }
   }
   window.addDepartment = addDepartment;
+
+  let editingDeptId = null;
+  window.openEditDept = function(id, code, name) {
+    editingDeptId = id;
+    document.getElementById('editDeptCode').value = code;
+    document.getElementById('editDeptName').value = name;
+    document.getElementById('editDeptModal').classList.add('show');
+  };
+  window.closeEditDept = function() {
+    document.getElementById('editDeptModal').classList.remove('show');
+    editingDeptId = null;
+  };
+  window.saveDeptEdit = async function() {
+    if (!editingDeptId) return;
+    const code = document.getElementById('editDeptCode').value.trim().toUpperCase();
+    const name = document.getElementById('editDeptName').value.trim();
+    if (!code || !name) { SAMS.toast('Code and Name are required.', 'error'); return; }
+    
+    try {
+      const res = await SAMS.apiFetch(`/api/admin/departments/${editingDeptId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ dept_code: code, dept_name: name })
+      });
+      if (res.ok) {
+        SAMS.toast('Department updated', 'success');
+        closeEditDept();
+        loadDepartments();
+      } else {
+        const data = await res.json();
+        SAMS.toast(data.error || 'Update failed', 'error');
+      }
+    } catch { SAMS.toast('Network error', 'error'); }
+  };
+  
+  window.deleteDepartment = function(id, name) {
+    confirmAction(`Are you sure you want to delete the department "${name}"?`, async () => {
+      try {
+        const res = await SAMS.apiFetch(`/api/admin/departments/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          SAMS.toast('Department deleted', 'success');
+          loadDepartments();
+          loadStats();
+        } else {
+          const data = await res.json();
+          SAMS.toast(data.error || 'Delete failed', 'error');
+        }
+      } catch { SAMS.toast('Network error', 'error'); }
+    });
+  };
 
   /* ── Attendance Monitoring ── */
   let monitorPage = 1;
