@@ -106,20 +106,7 @@ CREATE TABLE attendance_records (
     UNIQUE (session_id, student_id)
 );
 
-CREATE TABLE leave_requests (
-    request_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    reason TEXT,
-    document_url VARCHAR(255),
-    status ENUM(
-        'Pending',
-        'Approved',
-        'Rejected'
-    ) DEFAULT 'Pending',
-    FOREIGN KEY (student_id) REFERENCES students (student_id) ON DELETE CASCADE
-);
+
 
 -- Dummy data removed and moved to database/seed.sql
 
