@@ -15,622 +15,729 @@
     })();
   </script>
   <style>
+    /* ──────────────────────────────────────────────────────────
+       PREMIUM AUTH PAGE - REDESIGN
+       ────────────────────────────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
     body.auth-body {
       margin: 0;
       padding: 0;
-      background: var(--bg);
       min-height: 100vh;
-    }
-
-    .login-page {
-      display: flex;
-      min-height: 100vh;
-      font-family: var(--font-ui);
-    }
-
-    /* ══ LEFT HERO ══ */
-    .login-hero {
-      flex: 1;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 3.5rem 5% 3.5rem 8%;
-      overflow: hidden;
-      background: #0e2242;
-    }
-
-    .login-hero::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 10% 110%, rgba(37,99,235,0.35) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 50% at 90% -10%, rgba(14,165,233,0.2) 0%, transparent 55%),
-        linear-gradient(145deg, #0a1a38 0%, #0e2242 45%, #0a2a50 100%);
-      z-index: 0;
-    }
-
-    .login-hero::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px);
-      background-size: 28px 28px;
-      z-index: 1;
-    }
-
-    .hero-shapes { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
-
-    .hero-shape {
-      position: absolute;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.025);
-      border: 1px solid rgba(255,255,255,0.055);
-    }
-
-    .hero-shape-1 { width: 420px; height: 420px; top: -110px; right: -130px; }
-    .hero-shape-2 { width: 220px; height: 220px; bottom: 50px; left: -55px; }
-    .hero-shape-3 { width: 110px; height: 110px; bottom: 32%; right: 8%; background: rgba(37,99,235,0.055); border-color: rgba(37,99,235,0.12); }
-
-    .hero-content { position: relative; z-index: 3; max-width: 480px; }
-
-    .hero-logo-wrap {
-      width: 80px;
-      height: 80px;
-      border-radius: 20px;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.18);
-      backdrop-filter: blur(12px);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 2.5rem;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-      padding: 12px;
+      overflow-x: hidden;
+      position: relative;
     }
 
-    .hero-logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    /* ── Animated Mesh Gradient Background ── */
+    .mesh-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: var(--bg);
+      overflow: hidden;
+      transition: background-color 0.5s ease;
+    }
 
-    .hero-title {
-      font-size: 2.875rem;
+    .mesh-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: floatBlob 20s infinite alternate cubic-bezier(0.45, 0.05, 0.55, 0.95);
+      will-change: transform;
+    }
+
+    /* Light Theme Blobs */
+    [data-theme="light"] .blob-1 { background: rgba(59, 130, 246, 0.3); width: 50vw; height: 50vw; top: -10vw; left: -10vw; }
+    [data-theme="light"] .blob-2 { background: rgba(96, 165, 250, 0.25); width: 45vw; height: 45vw; bottom: -5vw; right: -10vw; animation-delay: -5s; }
+    [data-theme="light"] .blob-3 { background: rgba(147, 197, 253, 0.3); width: 35vw; height: 35vw; top: 30%; left: 50%; animation-delay: -10s; }
+
+    /* Dark Theme Blobs */
+    [data-theme="dark"] .blob-1 { background: rgba(30, 58, 138, 0.4); width: 50vw; height: 50vw; top: -10vw; left: -10vw; }
+    [data-theme="dark"] .blob-2 { background: rgba(23, 37, 84, 0.5); width: 45vw; height: 45vw; bottom: -5vw; right: -10vw; animation-delay: -5s; }
+    [data-theme="dark"] .blob-3 { background: rgba(30, 64, 175, 0.3); width: 35vw; height: 35vw; top: 30%; left: 50%; animation-delay: -10s; }
+
+    @keyframes floatBlob {
+      0% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(5vw, 5vh) scale(1.05); }
+      66% { transform: translate(-3vw, 8vh) scale(0.95); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mesh-blob { animation: none !important; }
+    }
+
+    /* ── Main Container (Glassmorphism) ── */
+    .auth-wrapper {
+      width: 100%;
+      max-width: 1000px;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+      position: relative;
+      z-index: 10;
+    }
+
+    .auth-container {
+      display: flex;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+      overflow: hidden;
+      animation: cardEnter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(30px) scale(0.98);
+    }
+
+    [data-theme="dark"] .auth-container {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    }
+
+    @keyframes cardEnter {
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Left Info Panel ── */
+    .auth-info {
+      flex: 1;
+      padding: 4rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+      background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 100%);
+      border-right: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    [data-theme="dark"] .auth-info {
+      background: linear-gradient(135deg, rgba(30,41,59,0.4) 0%, rgba(15,23,42,0.1) 100%);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-title {
+      font-size: 2.75rem;
       font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.035em;
-      color: #fff;
-      margin-bottom: 1.125rem;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      color: var(--text-1);
+      margin-bottom: 1.25rem;
     }
 
-    .hero-title-accent {
-      display: block;
-      background: linear-gradient(90deg, #60a5fa, #38bdf8);
+    .info-title .gradient-text {
+      background: linear-gradient(135deg, var(--primary-mid) 0%, #0ea5e9 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+    }
+
+    [data-theme="dark"] .info-title .gradient-text {
+      background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
-    .hero-sub {
-      font-size: 1.0625rem;
-      line-height: 1.65;
-      color: rgba(255,255,255,0.6);
-      max-width: 400px;
-      margin-bottom: 2.75rem;
+    .info-desc {
+      font-size: 1.125rem;
+      line-height: 1.6;
+      color: var(--text-2);
+      margin-bottom: 2.5rem;
+      max-width: 90%;
     }
 
-    .hero-features { display: flex; flex-direction: column; gap: 0.8rem; }
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
 
-    .hero-feature {
+    .feature-list li {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      color: rgba(255,255,255,0.72);
-      font-size: 0.9rem;
+      font-size: 1rem;
       font-weight: 500;
+      color: var(--text-2);
     }
 
-    .hero-feature-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #38bdf8;
-      flex-shrink: 0;
+    .feature-list i {
+      color: var(--primary-mid);
+      width: 20px;
+      height: 20px;
     }
 
-    /* ══ RIGHT AUTH PANEL ══ */
-    .login-panel {
-      width: 480px;
-      flex-shrink: 0;
-      background: var(--bg-surface);
-      border-left: 1px solid var(--border);
+    [data-theme="dark"] .feature-list i { color: #38bdf8; }
+
+    /* ── Right Form Panel ── */
+    .auth-panel {
+      width: 440px;
+      padding: 3.5rem 3rem;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 2.5rem 2rem;
       position: relative;
-      overflow-y: auto;
-    }
-
-    [data-theme="dark"] .login-panel {
-      background: #111827;
-      border-left-color: #1e293b;
     }
 
     .theme-btn-login {
       position: absolute;
-      top: 1.25rem;
-      right: 1.25rem;
-      width: 38px;
-      height: 38px;
+      top: 1.5rem;
+      right: 1.5rem;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       border: 1px solid var(--border);
-      background: var(--bg-hover);
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(4px);
       color: var(--text-2);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: background 0.2s, color 0.2s;
-      z-index: 10;
+      transition: all 0.2s ease;
+      z-index: 20;
     }
 
-    .theme-btn-login:hover { background: var(--bg-card); color: var(--text-1); }
-    .theme-btn-login svg { width: 17px; height: 17px; pointer-events: none; }
-
-    .auth-card { width: 100%; max-width: 380px; }
-
-    /* Single centered logo block */
-    .auth-brand-block {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      margin-bottom: 2rem;
+    [data-theme="dark"] .theme-btn-login {
+      background: rgba(30,41,59,0.5);
     }
 
-    .auth-logo-img {
-      width: 70px;
-      height: 70px;
-      object-fit: contain;
-      margin-bottom: 0.875rem;
-    }
-
-    .auth-brand-name {
-      font-size: 1.375rem;
-      font-weight: 800;
+    .theme-btn-login:hover {
+      background: var(--bg-surface);
       color: var(--text-1);
-      letter-spacing: -0.02em;
+      transform: scale(1.05);
     }
 
-    .auth-brand-tagline {
-      font-size: 0.8rem;
-      color: var(--text-3);
-      font-weight: 500;
-      margin-top: 0.2rem;
-    }
+    .theme-btn-login svg { width: 18px; height: 18px; pointer-events: none; }
 
-    /* Tabs */
-    .auth-tabs-new {
+    /* Logo - ONLY ONE */
+    .brand-header {
       display: flex;
-      background: var(--bg-hover);
-      padding: 3px;
-      border-radius: 10px;
-      margin-bottom: 1.75rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+      animation: logoFadeIn 0.8s ease forwards 0.2s;
+      opacity: 0;
+      transform: scale(0.95);
     }
 
-    .auth-tab-new {
+    .main-logo {
+      height: 80px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.1));
+    }
+
+    [data-theme="dark"] .main-logo {
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
+    }
+
+    @keyframes logoFadeIn {
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Tab Switcher ── */
+    .auth-tabs {
+      display: flex;
+      background: rgba(0,0,0,0.04);
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+
+    [data-theme="dark"] .auth-tabs {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .auth-tab {
       flex: 1;
-      padding: 0.625rem 1rem;
+      padding: 0.75rem 1rem;
       border: none;
       background: transparent;
       border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--text-3);
-      cursor: pointer;
-      transition: all 0.2s;
-      font-family: var(--font-ui);
-    }
-
-    .auth-tab-new.active {
-      background: var(--bg-surface);
-      color: var(--text-1);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-
-    [data-theme="dark"] .auth-tab-new.active {
-      background: #1e293b;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-    }
-
-    .auth-header-new { margin-bottom: 1.5rem; }
-
-    .auth-header-new h2 {
-      font-size: 1.375rem;
-      font-weight: 700;
-      color: var(--text-1);
-      letter-spacing: -0.025em;
-      margin-bottom: 0.3rem;
-    }
-
-    .auth-header-new p { font-size: 0.875rem; color: var(--text-3); line-height: 1.5; }
-
-    .form-group-new { margin-bottom: 1.125rem; }
-
-    .form-group-new label {
-      display: block;
-      font-size: 0.8125rem;
+      font-size: 0.9375rem;
       font-weight: 600;
       color: var(--text-2);
-      margin-bottom: 0.45rem;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .input-icon-wrap { position: relative; display: flex; align-items: center; }
-
-    .input-icon-wrap > i,
-    .input-icon-wrap > svg {
-      position: absolute;
-      left: 0.875rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-3);
-      width: 17px;
-      height: 17px;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .input-icon-wrap input {
-      width: 100%;
-      padding: 0.75rem 1rem 0.75rem 2.625rem;
-      background: var(--bg-input);
-      border: 1.5px solid var(--border);
-      border-radius: 9px;
-      font-family: var(--font-ui);
-      font-size: 0.9375rem;
+    .auth-tab.active {
+      background: var(--bg-surface);
       color: var(--text-1);
-      transition: border-color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
 
-    .input-icon-wrap input::placeholder { color: var(--text-3); }
+    [data-theme="dark"] .auth-tab.active {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
 
-    .input-icon-wrap input[type="password"],
-    .input-icon-wrap:has(.pw-toggle-new) input { padding-right: 3.5rem; }
+    /* ── Form Sections ── */
+    .auth-section {
+      display: none;
+      opacity: 0;
+      transform: translateX(10px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
 
-    .input-icon-wrap input:focus {
+    .auth-section.active {
+      display: block;
+      animation: sectionEnter 0.4s ease forwards;
+    }
+
+    @keyframes sectionEnter {
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .section-header {
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .section-header h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-1);
+      margin-bottom: 0.25rem;
+    }
+
+    .section-header p {
+      font-size: 0.9375rem;
+      color: var(--text-3);
+    }
+
+    /* ── Inputs ── */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-2);
+      margin-bottom: 0.5rem;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrap > i, .input-wrap > svg {
+      position: absolute;
+      left: 1rem;
+      color: var(--text-3);
+      width: 18px;
+      height: 18px;
+      transition: color 0.2s ease;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .input-wrap input {
+      width: 100%;
+      padding: 0.875rem 1rem 0.875rem 2.75rem;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 1rem;
+      color: var(--text-1);
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="dark"] .input-wrap input {
+      background: rgba(15,23,42,0.4);
+    }
+
+    .input-wrap input:focus {
       outline: none;
       border-color: var(--primary-mid);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+      background: var(--bg-surface);
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.1);
     }
 
-    [data-theme="dark"] .input-icon-wrap input:focus {
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.22);
+    .input-wrap input:focus + i, .input-wrap input:focus ~ svg {
+      color: var(--primary-mid);
     }
 
-    .pw-toggle-new {
+    [data-theme="dark"] .input-wrap input:focus {
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.2);
+    }
+
+    .input-wrap input[type="password"] {
+      padding-right: 3rem;
+    }
+
+    .pw-toggle {
       position: absolute;
-      right: 0.75rem;
+      right: 0.5rem;
       background: none;
       border: none;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--primary-mid);
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-3);
       cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s ease;
       z-index: 2;
-      padding: 0.25rem;
-      font-family: var(--font-ui);
     }
 
-    .pw-toggle-new:hover { color: var(--primary); }
+    .pw-toggle:hover {
+      background: var(--bg-hover);
+      color: var(--text-1);
+    }
 
-    .role-boxes-new { display: grid; grid-template-columns: 1fr 1fr; gap: 0.625rem; }
+    .pw-toggle svg { width: 18px; height: 18px; position: static !important; transform: none !important; margin: 0 !important; }
 
-    .role-box-new { position: relative; cursor: pointer; }
-    .role-box-new input { position: absolute; opacity: 0; width: 0; height: 0; }
+    /* ── Role Selection (Register) ── */
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
 
-    .role-box-content {
+    .role-card {
+      position: relative;
+      cursor: pointer;
+    }
+
+    .role-card input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .role-content {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      padding: 0.875rem 0.5rem;
-      border: 1.5px solid var(--border);
-      border-radius: 9px;
+      gap: 0.5rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.4);
+      border-radius: 10px;
       color: var(--text-2);
-      transition: all 0.2s;
-      font-size: 0.875rem;
+      transition: all 0.2s ease;
       font-weight: 600;
+      font-size: 0.9375rem;
     }
 
-    .role-box-content svg, .role-box-content i { width: 20px; height: 20px; }
+    [data-theme="dark"] .role-content { background: rgba(15,23,42,0.2); }
 
-    .role-box-new input:checked + .role-box-content {
+    .role-content svg { width: 22px; height: 22px; }
+
+    .role-card input:checked + .role-content {
       border-color: var(--primary-mid);
-      background: var(--primary-light);
+      background: var(--info-bg);
       color: var(--primary-mid);
     }
 
-    [data-theme="dark"] .role-box-new input:checked + .role-box-content {
-      background: rgba(37,99,235,0.15);
-      border-color: rgba(37,99,235,0.5);
-    }
-
-    .faculty-note-new {
+    .faculty-note {
       display: none;
-      font-size: 0.75rem;
+      font-size: 0.8125rem;
       color: var(--warning);
       background: var(--warning-bg);
-      padding: 0.625rem 0.75rem;
-      border-radius: 7px;
-      margin-top: 0.625rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-top: 0.75rem;
       border: 1px solid var(--warning-border);
       line-height: 1.5;
+      animation: fadeIn 0.3s ease;
     }
 
-    .faculty-note-new.show { display: block; }
+    .faculty-note.show { display: block; }
 
-    .btn-submit-new {
+    /* ── Submit Button ── */
+    .btn-submit {
       width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      background: linear-gradient(135deg, #1E3A5F 0%, #1a4a8a 100%);
+      background: linear-gradient(135deg, var(--primary-mid) 0%, #1d4ed8 100%);
       color: #fff;
       padding: 0.875rem;
       border: none;
-      border-radius: 9px;
-      font-size: 0.9375rem;
-      font-weight: 700;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      margin-top: 1.25rem;
-      transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
-      box-shadow: 0 4px 14px rgba(30,58,95,0.28);
-      font-family: var(--font-ui);
-      letter-spacing: 0.01em;
+      margin-top: 1.5rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(37,99,235,0.25);
     }
 
-    .btn-submit-new:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(30,58,95,0.38);
-      filter: brightness(1.06);
+    .btn-submit:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(37,99,235,0.3);
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
 
-    .btn-submit-new:active:not(:disabled) { transform: translateY(0); }
-    .btn-submit-new:disabled { opacity: 0.7; cursor: not-allowed; }
-    .btn-submit-new i, .btn-submit-new svg { width: 17px; height: 17px; }
+    .btn-submit:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(37,99,235,0.2);
+    }
 
-    .notice-new {
-      margin-top: 0.875rem;
-      padding: 0.75rem 0.875rem;
+    .btn-submit:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-submit svg { width: 18px; height: 18px; }
+
+    /* ── Notices ── */
+    .notice {
+      margin-top: 1rem;
+      padding: 0.875rem;
       border-radius: 8px;
       font-size: 0.875rem;
       display: none;
       line-height: 1.5;
+      animation: fadeIn 0.3s ease;
+      font-weight: 500;
     }
 
-    .notice-new.show { display: block; }
-    .notice-new.error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
-    .notice-new.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+    .notice.show { display: block; }
+    .notice.error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+    .notice.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
 
-    .auth-footer-new {
+    /* ── Footer ── */
+    .auth-footer {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.375rem;
-      margin-top: 2rem;
-      font-size: 0.75rem;
+      gap: 0.5rem;
+      margin-top: 2.5rem;
+      font-size: 0.8125rem;
       font-weight: 500;
       color: var(--text-3);
     }
 
-    .auth-footer-new i { width: 13px; height: 13px; }
+    .auth-footer svg { width: 14px; height: 14px; }
 
-    .auth-section-new { display: none; animation: authFadeIn 0.25s ease; }
-    .auth-section-new.active { display: block; }
-
-    @keyframes authFadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
 
     /* ══ RESPONSIVE ══ */
-    @media (max-width: 1024px) {
-      .login-page { flex-direction: column; }
-
-      .login-hero {
-        flex: none;
-        min-height: 240px;
-        padding: 2.5rem 5%;
+    @media (max-width: 900px) {
+      .auth-wrapper { padding: 1.5rem; }
+      .auth-container { flex-direction: column; max-width: 500px; }
+      
+      .auth-info {
+        padding: 2.5rem 2rem;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
         align-items: center;
         text-align: center;
       }
+      
+      [data-theme="dark"] .auth-info { border-bottom-color: rgba(255, 255, 255, 0.05); }
 
-      .hero-content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        max-width: 600px;
-      }
-
-      .hero-logo-wrap { width: 60px; height: 60px; border-radius: 14px; margin-bottom: 1.25rem; padding: 9px; }
-      .hero-title { font-size: 1.875rem; margin-bottom: 0.75rem; }
-      .hero-sub { font-size: 0.9375rem; margin-bottom: 1.5rem; }
-
-      .hero-features {
+      .info-title { font-size: 2.25rem; margin-bottom: 1rem; }
+      .info-desc { margin-bottom: 1.5rem; font-size: 1rem; }
+      
+      .feature-list {
         flex-direction: row;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 0.5rem 1.5rem;
+        gap: 0.75rem 1.5rem;
       }
-
-      .login-panel {
-        width: 100%;
-        flex: 1;
-        border-left: none;
-        border-top: 1px solid var(--border);
-        padding: 2.5rem 1.5rem 3rem;
-      }
+      
+      .feature-list li { font-size: 0.875rem; }
+      
+      .auth-panel { width: 100%; padding: 2.5rem 2rem; }
     }
 
-    @media (max-width: 640px) {
-      .login-hero { padding: 1.75rem 1.25rem; }
-      .hero-logo-wrap { width: 48px; height: 48px; padding: 7px; border-radius: 11px; margin-bottom: 1rem; }
-      .hero-title { font-size: 1.5rem; }
-      .hero-sub { font-size: 0.875rem; margin-bottom: 0.75rem; }
-      .hero-features { display: none; }
-      .login-panel { padding: 2rem 1.25rem 2.5rem; justify-content: flex-start; padding-top: 3rem; }
-      .auth-card { max-width: 100%; }
-      .auth-logo-img { width: 58px; height: 58px; }
+    @media (max-width: 500px) {
+      .auth-wrapper { padding: 1rem; }
+      
+      .auth-info { display: none; /* Hide info on very small screens to save space */ }
+      
+      .auth-container { border-radius: 20px; }
+      .auth-panel { padding: 2.5rem 1.5rem; }
+      
+      .brand-header { margin-bottom: 1.5rem; }
+      .main-logo { height: 64px; }
+      
+      .info-title { font-size: 1.75rem; }
     }
   </style>
 </head>
 <body class="auth-body">
 
-<div class="login-page">
+  <!-- Background -->
+  <div class="mesh-bg" aria-hidden="true">
+    <div class="mesh-blob blob-1"></div>
+    <div class="mesh-blob blob-2"></div>
+    <div class="mesh-blob blob-3"></div>
+  </div>
 
-  <!-- ══ LEFT: Hero Panel ══ -->
-  <div class="login-hero">
-    <div class="hero-shapes" aria-hidden="true">
-      <div class="hero-shape hero-shape-1"></div>
-      <div class="hero-shape hero-shape-2"></div>
-      <div class="hero-shape hero-shape-3"></div>
-    </div>
-
-    <div class="hero-content">
-      <div class="hero-logo-wrap">
-        <img src="/assets/satt-logo.png" alt="SATT Logo">
+  <div class="auth-wrapper">
+    <div class="auth-container">
+      
+      <!-- ══ LEFT: Info Panel ══ -->
+      <div class="auth-info">
+        <h1 class="info-title">
+          Student Attendance<br>
+          <span class="gradient-text">Threshold Tracker</span>
+        </h1>
+        <p class="info-desc">A premium, intelligent platform for seamless attendance management, designed for modern universities.</p>
+        
+        <ul class="feature-list">
+          <li><i data-lucide="zap"></i> Real-time Sync</li>
+          <li><i data-lucide="qr-code"></i> Quick QR Check-in</li>
+          <li><i data-lucide="bell-ring"></i> Smart Threshold Alerts</li>
+          <li><i data-lucide="shield-check"></i> Secure Role Access</li>
+        </ul>
       </div>
-      <h1 class="hero-title">
-        Student Attendance<br>
-        <span class="hero-title-accent">Threshold Tracker</span>
-      </h1>
-      <p class="hero-sub">Smart, real-time attendance monitoring for students, faculty, and administrators.</p>
 
-      <div class="hero-features">
-        <div class="hero-feature"><div class="hero-feature-dot"></div>Real-time monitoring</div>
-        <div class="hero-feature"><div class="hero-feature-dot"></div>QR-based check-in</div>
-        <div class="hero-feature"><div class="hero-feature-dot"></div>Threshold alerts</div>
-        <div class="hero-feature"><div class="hero-feature-dot"></div>Role-based access</div>
+      <!-- ══ RIGHT: Auth Panel ══ -->
+      <div class="auth-panel">
+        
+        <button class="theme-btn-login" id="themeToggle" type="button" aria-label="Toggle theme">
+          <i data-lucide="moon"></i>
+        </button>
+
+        <!-- Brand / Single Logo -->
+        <div class="brand-header">
+          <img src="/assets/satt-logo.png" alt="SATT Logo" class="main-logo">
+        </div>
+
+        <!-- Tabs -->
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+          <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Create Account</button>
+        </div>
+
+        <!-- ── LOGIN SECTION ── -->
+        <div class="auth-section active" id="loginSection">
+          <div class="section-header">
+            <h2>Welcome Back</h2>
+            <p>Access your university portal</p>
+          </div>
+          
+          <form id="loginForm">
+            <div class="form-group">
+              <label for="loginEmail">Institutional Email</label>
+              <div class="input-wrap">
+                <i data-lucide="mail"></i>
+                <input type="email" id="loginEmail" placeholder="you@university.edu" required autocomplete="email">
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="loginPassword">Password</label>
+              <div class="input-wrap">
+                <i data-lucide="lock"></i>
+                <input type="password" id="loginPassword" placeholder="Enter your password" required autocomplete="current-password">
+                <button type="button" class="pw-toggle" data-for="loginPassword" aria-label="Toggle password visibility">
+                  <i data-lucide="eye"></i>
+                </button>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn-submit" id="loginBtn">
+              Sign In <i data-lucide="arrow-right"></i>
+            </button>
+          </form>
+          <div id="loginNotice" class="notice"></div>
+        </div>
+
+        <!-- ── REGISTER SECTION ── -->
+        <div class="auth-section" id="registerSection">
+          <div class="section-header">
+            <h2>Join the Platform</h2>
+            <p>Register with your credentials</p>
+          </div>
+          
+          <form id="registerForm">
+            <div class="form-group">
+              <label for="regName">Full Name</label>
+              <div class="input-wrap">
+                <i data-lucide="user"></i>
+                <input type="text" id="regName" placeholder="Your legal name" required autocomplete="name">
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="regEmail">Institutional Email</label>
+              <div class="input-wrap">
+                <i data-lucide="mail"></i>
+                <input type="email" id="regEmail" placeholder="you@university.edu" required autocomplete="email">
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="regPassword">Password</label>
+              <div class="input-wrap">
+                <i data-lucide="lock"></i>
+                <input type="password" id="regPassword" placeholder="Min 8 characters" minlength="8" required>
+                <button type="button" class="pw-toggle" data-for="regPassword" aria-label="Toggle password visibility">
+                  <i data-lucide="eye"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label>Select Role</label>
+              <div class="role-grid">
+                <label class="role-card">
+                  <input type="radio" name="regRole" value="student" checked>
+                  <div class="role-content">
+                    <i data-lucide="graduation-cap"></i>
+                    <span>Student</span>
+                  </div>
+                </label>
+                <label class="role-card">
+                  <input type="radio" name="regRole" value="faculty">
+                  <div class="role-content">
+                    <i data-lucide="book-open"></i>
+                    <span>Faculty</span>
+                  </div>
+                </label>
+              </div>
+              <p class="faculty-note" id="facultyNote">Faculty accounts require administrative approval before activation.</p>
+            </div>
+            
+            <button type="submit" class="btn-submit" id="registerBtn">
+              Create Account <i data-lucide="user-plus"></i>
+            </button>
+          </form>
+          <div id="registerNotice" class="notice"></div>
+        </div>
+
+        <div class="auth-footer">
+          <i data-lucide="shield-check"></i> <span>Secure University Portal</span>
+        </div>
+        
       </div>
     </div>
   </div>
-
-  <!-- ══ RIGHT: Auth Panel ══ -->
-  <div class="login-panel">
-    <button class="theme-btn-login" id="themeToggle" type="button" aria-label="Toggle theme">
-      <i data-lucide="moon"></i>
-    </button>
-
-    <div class="auth-card">
-
-      <!-- Single centered logo -->
-      <div class="auth-brand-block">
-        <img class="auth-logo-img" src="/assets/satt-logo.png" alt="SATT">
-        <div class="auth-brand-name">SATT</div>
-        <div class="auth-brand-tagline">University Attendance Portal</div>
-      </div>
-
-      <!-- Tab switcher -->
-      <div class="auth-tabs-new">
-        <button class="auth-tab-new active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
-        <button class="auth-tab-new" id="tabRegister" onclick="switchTab('register')">Register</button>
-      </div>
-
-      <!-- ── LOGIN ── -->
-      <div class="auth-section-new active" id="loginSection">
-        <div class="auth-header-new">
-          <h2>Welcome back</h2>
-          <p>Sign in to access your portal.</p>
-        </div>
-        <form id="loginForm">
-          <div class="form-group-new">
-            <label for="loginEmail">Institutional Email</label>
-            <div class="input-icon-wrap">
-              <i data-lucide="mail"></i>
-              <input type="email" id="loginEmail" placeholder="you@university.edu" required autocomplete="email">
-            </div>
-          </div>
-          <div class="form-group-new">
-            <label for="loginPassword">Password</label>
-            <div class="input-icon-wrap">
-              <i data-lucide="lock"></i>
-              <input type="password" id="loginPassword" placeholder="Your password" required autocomplete="current-password">
-              <button type="button" class="pw-toggle-new" data-for="loginPassword">Show</button>
-            </div>
-          </div>
-          <button type="submit" class="btn-submit-new" id="loginBtn">
-            Sign In <i data-lucide="arrow-right"></i>
-          </button>
-        </form>
-        <div id="loginNotice" class="notice-new"></div>
-      </div>
-
-      <!-- ── REGISTER ── -->
-      <div class="auth-section-new" id="registerSection">
-        <div class="auth-header-new">
-          <h2>Create Account</h2>
-          <p>Register with your university credentials.</p>
-        </div>
-        <form id="registerForm">
-          <div class="form-group-new">
-            <label for="regName">Full Name</label>
-            <div class="input-icon-wrap">
-              <i data-lucide="user"></i>
-              <input type="text" id="regName" placeholder="Your legal name" required autocomplete="name">
-            </div>
-          </div>
-          <div class="form-group-new">
-            <label for="regEmail">Institutional Email</label>
-            <div class="input-icon-wrap">
-              <i data-lucide="mail"></i>
-              <input type="email" id="regEmail" placeholder="you@university.edu" required autocomplete="email">
-            </div>
-          </div>
-          <div class="form-group-new">
-            <label for="regPassword">Password</label>
-            <div class="input-icon-wrap">
-              <i data-lucide="lock"></i>
-              <input type="password" id="regPassword" placeholder="Min 8 characters" minlength="8" required>
-              <button type="button" class="pw-toggle-new" data-for="regPassword">Show</button>
-            </div>
-          </div>
-          <div class="form-group-new">
-            <label>Account Type</label>
-            <div class="role-boxes-new">
-              <label class="role-box-new">
-                <input type="radio" name="regRole" value="student" checked>
-                <div class="role-box-content">
-                  <i data-lucide="graduation-cap"></i>
-                  <span>Student</span>
-                </div>
-              </label>
-              <label class="role-box-new">
-                <input type="radio" name="regRole" value="faculty">
-                <div class="role-box-content">
-                  <i data-lucide="book-open"></i>
-                  <span>Faculty</span>
-                </div>
-              </label>
-            </div>
-            <p class="faculty-note-new" id="facultyNote">Faculty accounts require administrative approval before activation.</p>
-          </div>
-          <button type="submit" class="btn-submit-new" id="registerBtn">
-            Register Account <i data-lucide="arrow-right"></i>
-          </button>
-        </form>
-        <div id="registerNotice" class="notice-new"></div>
-      </div>
-
-      <div class="auth-footer-new">
-        <i data-lucide="shield-check"></i> Secure University Portal
-      </div>
-    </div>
-  </div>
-
-</div>
 
 <script src="/app.js"></script>
 <script>
@@ -655,13 +762,15 @@
   }
   window.switchTab = switchTab;
 
-  document.querySelectorAll('.pw-toggle-new').forEach(btn => {
+  // Modern password toggle using Lucide icons
+  document.querySelectorAll('.pw-toggle').forEach(btn => {
     btn.addEventListener('click', () => {
       const inp = document.getElementById(btn.dataset.for);
       if (!inp) return;
       const showing = inp.type === 'text';
       inp.type = showing ? 'password' : 'text';
-      btn.textContent = showing ? 'Show' : 'Hide';
+      btn.innerHTML = showing ? '<i data-lucide="eye"></i>' : '<i data-lucide="eye-off"></i>';
+      lucide.createIcons();
     });
   });
 
@@ -675,10 +784,10 @@
   function setNotice(id, msg, type) {
     const el = document.getElementById(id);
     el.textContent = msg;
-    el.className = 'notice-new show ' + type;
+    el.className = 'notice show ' + type;
   }
   function clearNotice(id) {
-    document.getElementById(id).className = 'notice-new';
+    document.getElementById(id).className = 'notice';
   }
 
   /* ── LOGIN ── */
