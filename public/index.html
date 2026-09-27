@@ -238,11 +238,15 @@
       height: 80px;
       width: auto;
       object-fit: contain;
-      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.1));
+      mix-blend-mode: multiply; /* Removes white background against light backgrounds */
     }
 
     [data-theme="dark"] .main-logo {
-      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
+      mix-blend-mode: normal;
+      background: #ffffff; /* Blends with the image's white background */
+      border-radius: 18px; /* Creates a clean app-icon look */
+      padding: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.4);
     }
 
     @keyframes logoFadeIn {
@@ -638,7 +642,6 @@
         <div class="auth-section active" id="loginSection">
           <div class="section-header">
             <h2>Welcome Back</h2>
-            <p>Access your university portal</p>
           </div>
           
           <form id="loginForm">
