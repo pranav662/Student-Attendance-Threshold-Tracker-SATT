@@ -1026,7 +1026,9 @@
     if (icon)  icon.setAttribute('data-lucide', 'loader');
     lucide.createIcons();
     try {
-      const res = await fetch(`/api/student/report/pdf?token=${token}`);
+      const res = await fetch('/api/student/report/pdf', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         SAMS.toast(data.error || 'Unable to generate report.', 'error');

@@ -26,7 +26,7 @@ SATT empowers **Faculty** to generate secure, live QR codes for rapid in-class a
 ## ✨ Key Features
 
 - **Live QR Attendance**: Faculty can launch live sessions that generate rotating QR codes. Students scan them to securely record their attendance.
-- **What-If Threshold Calculator**: Students can simulate future attendance to see exactly how many classes they can miss or must attend to stay above the university threshold (default 75%).
+- **What-If Threshold Calculator**: Students can simulate future attendance to see exactly how many classes they can miss or must attend to stay above the configured university threshold.
 - **Interactive Glassmorphism UI**: A premium, visually stunning UI featuring smooth transitions, frosted glass effects, and a dynamic mesh gradient background.
 - **Responsive Dark/Light Theme**: Fully supported across all dashboards for comfortable day or night viewing.
 - **PDF Report Generation**: Students can download official, cleanly formatted PDF reports of their attendance records using `PDFKit`.
@@ -142,12 +142,12 @@ Student-Attendance-Threshold-Tracker-SATT/
 6. An `attendance_record` is inserted marking the student as 'Present'.
 
 ### 2. Threshold Calculation Logic
-The system actively evaluates a student's standing against a configurable system variable (`attendance_threshold`, default `75%`).
+The system actively evaluates a student's standing against a configurable system variable (`attendance_threshold`, e.g., `75%`).
 
 - **Attendance %** = `(Present Classes / Total Classes) * 100`
-- **What-If Calculation**: 
-  - To maintain the threshold: `Can Miss = Total Classes - (Present Classes / 0.75)`
-  - To reach the threshold: `Must Attend = (0.75 * Total Classes - Present Classes) / 0.25`
+- **What-If Calculation** (where `T` is the configured attendance threshold as a decimal):
+  - To maintain the threshold: `Can Miss = Total Classes - (Present Classes / T)`
+  - To reach the threshold: `Must Attend = (T * Total Classes - Present Classes) / (1 - T)`
 
 ---
 
@@ -155,7 +155,7 @@ The system actively evaluates a student's standing against a configurable system
 
 - **JSON Web Tokens (JWT)**: Secure authentication mechanism using stateless tokens.
 - **Role-Based Authorization**: API endpoints are strictly protected. For example, `checkRole(['admin'])` ensures only administrators can access `/api/admin/*` routes.
-- **Password Hashing**: User passwords are encrypted in the database using `bcrypt`.
+- **Password Hashing**: User passwords are securely hashed using `bcrypt` in the database.
 - **Sanitization**: SQL queries use prepared statements (`mysql2` placeholders) to entirely prevent SQL Injection attacks.
 
 ---
@@ -163,7 +163,7 @@ The system actively evaluates a student's standing against a configurable system
 ## 🚀 Installation & Setup
 
 ### Prerequisites
-- Node.js (v16+)
+- Node.js (v18+)
 - MySQL Server
 
 ### 1. Clone & Install

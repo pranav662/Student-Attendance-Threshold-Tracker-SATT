@@ -3,6 +3,7 @@ require('dotenv').config();
 const crypto = require('crypto');
 const path = require('path');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -54,16 +55,32 @@ const pool = mysql.createPool({
 app.use(express.json({ limit: '16kb' }));
 app.get('/faculty.html', (req, res) => res.redirect('/faculty/faculty_dashboard.html'));
 app.get('/student.html', (req, res) => res.redirect('/student/student_dashboard.html'));
-// Serve static files with no-cache headers during development
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+const isProd = process.env.NODE_ENV === 'production';
 app.use(express.static(path.join(__dirname, 'public'), {
-  etag: false,
-  maxAge: 0,
+  etag: isProd,
+  maxAge: isProd ? '1d' : 0,
   setHeaders: (res, path) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    if (!isProd) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
   }
 }));
+
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // ── Small helpers ──────────────────────────────────────────
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -228,7 +245,15 @@ app.post('/register', async (req, res, next) => {
   }
 });
 
-app.post('/login', async (req, res, next) => {
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 login requests per `window`
+  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const email    = stringValue(req.body.email || req.body.username).toLowerCase();
     const password = String(req.body.password || '');
@@ -1884,7 +1909,7 @@ app.use((error, req, res, next) => {
 pool.getConnection()
   .then(connection => {
     connection.release();
-    app.listen(port, () => console.log(`SAMS listening on http://localhost:${port}`));
+    app.listen(port, () => console.log(`SATT listening on http://localhost:${port}`));
   })
   .catch(error => {
     console.error(`Database connection failed: ${error.message}`);

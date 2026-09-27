@@ -1,5 +1,5 @@
 /* ============================================================
-   SAMS — Shared client utilities
+   SATT — Shared client utilities
    Auth guard · Fetch wrapper · Toast · Theme toggle · Escape
    ============================================================ */
 (function () {

@@ -1365,13 +1365,28 @@
   window.saveSessionAttendance = saveSessionAttendance;
 
   /* ── Download report ── */
-  function downloadReport() {
+  async function downloadReport() {
     const token = SAMS.getToken();
     if (!token) return;
-    const a = document.createElement('a');
-    a.href = `/api/faculty/report/pdf?token=${token}`;
-    a.download = 'faculty_report.pdf';
-    a.click();
+    try {
+      const res = await fetch('/api/faculty/report/pdf', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        SAMS.toast(data.error || 'Unable to generate report.', 'error');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'faculty_report.pdf';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      SAMS.toast('Unable to download report. Please try again.', 'error');
+    }
   }
   window.downloadReport = downloadReport;
 
