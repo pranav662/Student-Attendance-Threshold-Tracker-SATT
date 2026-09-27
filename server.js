@@ -398,22 +398,53 @@ app.put('/api/admin/users/:id/status', authenticate, requireRole('admin'), async
 
 /* ── Edit Student ── */
 app.put('/api/admin/students/:id', authenticate, requireRole('admin'), async (req, res, next) => {
+  const connection = await pool.getConnection();
   try {
     const studentId = parseInt(req.params.id);
-    const { name, roll_number, batch_year } = req.body;
-    if (!name || !roll_number || !batch_year) return fail(res, 400, 'Missing required fields.');
+    const { name, roll_number, batch_year, email, status } = req.body;
+    if (!name || !roll_number || !batch_year || !email || !status) return fail(res, 400, 'Missing required fields.');
+    if (!['approved', 'pending', 'rejected'].includes(status)) return fail(res, 400, 'Invalid status value.');
     
-    const [existing] = await pool.execute('SELECT student_id FROM students WHERE roll_number = ? AND student_id != ?', [roll_number, studentId]);
-    if (existing.length > 0) return fail(res, 409, 'Roll number already in use by another student.');
+    await connection.beginTransaction();
 
-    const [result] = await pool.execute(
+    const [students] = await connection.execute('SELECT user_id FROM students WHERE student_id = ? FOR UPDATE', [studentId]);
+    if (!students.length) {
+      await connection.rollback();
+      return fail(res, 404, 'Student not found.');
+    }
+    const userId = students[0].user_id;
+
+    const [existingRoll] = await connection.execute('SELECT student_id FROM students WHERE roll_number = ? AND student_id != ?', [roll_number, studentId]);
+    if (existingRoll.length > 0) {
+      await connection.rollback();
+      return fail(res, 409, 'Roll number already in use by another student.');
+    }
+
+    const [existingEmail] = await connection.execute('SELECT user_id FROM users WHERE email = ? AND user_id != ?', [email, userId]);
+    if (existingEmail.length > 0) {
+      await connection.rollback();
+      return fail(res, 409, 'Email already in use by another user.');
+    }
+
+    await connection.execute(
       'UPDATE students SET name = ?, roll_number = ?, batch_year = ? WHERE student_id = ?',
       [name, roll_number, batch_year, studentId]
     );
-    if (!result.affectedRows) return fail(res, 404, 'Student not found.');
+
+    await connection.execute(
+      'UPDATE users SET email = ?, status = ? WHERE user_id = ?',
+      [email, status, userId]
+    );
+
+    await connection.commit();
     auditLog(req.user.sub, 'admin', 'UPDATE_STUDENT', 'student', studentId);
     return res.json({ message: 'Student updated successfully.' });
-  } catch (error) { return next(error); }
+  } catch (error) {
+    await connection.rollback();
+    return next(error);
+  } finally {
+    connection.release();
+  }
 });
 
 /* ── Delete Student ── */

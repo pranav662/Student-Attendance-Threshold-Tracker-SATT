@@ -377,11 +377,8 @@
           <div class="card" id="sessionDetailsCard" style="display:none;">
             <div class="section-head" style="margin-bottom:0.875rem;">
               <div class="card-title">Session Attendance</div>
-              <div style="display:flex;gap:0.75rem;align-items:center;">
-                <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.875rem;cursor:pointer;">
-                  <input type="checkbox" id="sessionEditModeToggle" onchange="toggleSessionEditMode()">
-                  Edit Mode
-                </label>
+              <div style="display:flex;gap:0.75rem;align-items:center;" id="sessionViewActions">
+                <button class="btn btn-primary btn-sm" onclick="toggleSessionEditMode()"><i data-lucide="edit-2"></i> Edit Attendance</button>
                 <button class="btn btn-ghost btn-sm" onclick="closeSessionDetails()">Back</button>
               </div>
             </div>
@@ -394,15 +391,20 @@
               <div><div class="attend-summary-val" id="sessTotal">0</div><div class="attend-summary-lbl">Total</div></div>
             </div>
 
-            <div class="chk-list" id="sessionStudentList"></div>
+            <!-- Table Header -->
+            <div style="display:flex; padding:0.75rem 1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md) var(--r-md) 0 0; font-size:0.85rem; font-weight:600; color:var(--text-2); margin-top:1rem;">
+              <div style="width:80px;">Roll No</div>
+              <div style="flex:1;">Student</div>
+              <div style="width:160px; text-align:center;">Attendance</div>
+            </div>
+            
+            <div id="sessionStudentList" style="border-radius:0 0 var(--r-md) var(--r-md);"></div>
 
-            <div class="chk-list" id="sessionStudentList"></div>
-
-            <div id="sessionEditActions" style="margin-top:1rem;display:none;gap:0.625rem;align-items:center;">
-              <button class="btn btn-primary" id="saveSessionBtn" onclick="saveSessionAttendance()">
-                <i data-lucide="save"></i> Save Changes
-              </button>
+            <div id="sessionEditActions" style="margin-top:1.5rem;display:none;justify-content:flex-end;gap:0.625rem;align-items:center;">
               <button class="btn btn-ghost" onclick="cancelSessionEdit()">Cancel</button>
+              <button class="btn btn-primary" id="saveSessionBtn" onclick="saveSessionAttendance()">
+                <i data-lucide="save"></i> Save Attendance
+              </button>
             </div>
             <div id="sessionNotice" class="notice"></div>
           </div>
@@ -1189,7 +1191,7 @@
     
     // Reset Edit Mode
     window.sessionEditMode = false;
-    document.getElementById('sessionEditModeToggle').checked = false;
+    document.getElementById('sessionViewActions').style.display = 'flex';
     document.getElementById('sessionEditActions').style.display = 'none';
     
     const container = document.getElementById('sessionStudentList');
@@ -1216,7 +1218,7 @@
   function renderSessionStudentList(records) {
     const container = document.getElementById('sessionStudentList');
     if (!records.length) {
-      container.innerHTML = `<div class="empty-state"><div class="ei">👥</div><p>No students found.</p></div>`;
+      container.innerHTML = `<div class="empty-state" style="border:1px solid var(--border); border-top:none;"><div class="ei">👥</div><p>No students found.</p></div>`;
       updateSessionSummary(0, 0);
       return;
     }
@@ -1228,25 +1230,32 @@
       const isPresent = r.status === 'Present';
       if (isPresent) present++; else absent++;
       return `
-        <label class="chk-item">
-          <input type="checkbox" id="sess_stu_${i}" ${isPresent ? 'checked' : ''} ${window.sessionEditMode ? '' : 'disabled'} onchange="window.attendanceIsDirty = true;">
-          <div>
-            <div class="chk-name">${escHtml(r.name)}</div>
-            <div class="chk-roll">${escHtml(r.roll_number)}</div>
+        <div style="display:flex; align-items:center; padding:0.75rem 1rem; border:1px solid var(--border); border-top:none; background:var(--bg-card);">
+          <div style="width:80px; font-family:var(--font-mono); font-size:0.85rem;">${escHtml(r.roll_number)}</div>
+          <div style="flex:1; font-weight:500;">${escHtml(r.name)}</div>
+          <div style="width:160px; display:flex; justify-content:center; gap:0.25rem;">
+            ${window.sessionEditMode ? `
+              <button class="btn btn-sm ${isPresent ? 'btn-primary' : 'btn-ghost'}" onclick="markAttendance(${i}, 'Present')" style="flex:1; ${isPresent ? 'background:var(--success); color:white; border-color:var(--success);' : ''}">Present</button>
+              <button class="btn btn-sm ${!isPresent ? 'btn-primary' : 'btn-ghost'}" onclick="markAttendance(${i}, 'Absent')" style="flex:1; ${!isPresent ? 'background:var(--danger); color:white; border-color:var(--danger);' : ''}">Absent</button>
+            ` : `
+              <span class="badge ${isPresent ? 'badge-safe' : 'badge-danger'}">${isPresent ? 'Present' : 'Absent'}</span>
+            `}
           </div>
-        </label>
+        </div>
       `;
     }).join('');
     
     updateSessionSummary(present, absent);
-    
-    for (let i = 0; i < records.length; i++) {
-      document.getElementById('sess_stu_' + i).addEventListener('change', function() {
-        if (this.checked) { present++; absent--; } else { present--; absent++; }
-        updateSessionSummary(present, absent);
-      });
-    }
   }
+
+  window.markAttendance = function(index, status) {
+    if (!window.sessionEditMode) return;
+    if (sessionStudentData[index].status !== status) {
+      sessionStudentData[index].status = status;
+      window.attendanceIsDirty = true;
+      renderSessionStudentList(sessionStudentData);
+    }
+  };
 
   function updateSessionSummary(p, a) {
     document.getElementById('sessPresent').textContent = p;
@@ -1262,17 +1271,17 @@
   }
 
   window.toggleSessionEditMode = function() {
-    window.sessionEditMode = document.getElementById('sessionEditModeToggle').checked;
-    document.getElementById('sessionEditActions').style.display = window.sessionEditMode ? 'flex' : 'none';
+    window.sessionEditMode = true;
+    document.getElementById('sessionViewActions').style.display = 'none';
+    document.getElementById('sessionEditActions').style.display = 'flex';
     renderSessionStudentList(sessionStudentData);
   };
 
   window.cancelSessionEdit = function() {
     window.sessionEditMode = false;
-    document.getElementById('sessionEditModeToggle').checked = false;
+    document.getElementById('sessionViewActions').style.display = 'flex';
     document.getElementById('sessionEditActions').style.display = 'none';
     window.attendanceIsDirty = false;
-    // Reload original data
     if (currentSessionId) loadSessionAttendance(currentSessionId, true);
   };
 
@@ -1282,11 +1291,10 @@
       return;
     }
     
-    const records = sessionStudentData.map((s, i) => {
-      const chk = document.getElementById('sess_stu_' + i);
+    const records = sessionStudentData.map(s => {
       return {
         student_id: s.student_id,
-        status: chk.checked ? 'Present' : 'Absent'
+        status: s.status
       };
     });
     
@@ -1308,7 +1316,7 @@
           notice.className = 'notice'; 
           // Instead of closing session details, let's keep it open but exit Edit mode
           window.sessionEditMode = false;
-          document.getElementById('sessionEditModeToggle').checked = false;
+          document.getElementById('sessionViewActions').style.display = 'flex';
           document.getElementById('sessionEditActions').style.display = 'none';
           loadSessionAttendance(currentSessionId, true);
         }, 1500);

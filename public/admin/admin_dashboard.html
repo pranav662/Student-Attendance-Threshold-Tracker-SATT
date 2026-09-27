@@ -958,27 +958,51 @@
 
     <!-- ── Edit Student Modal ── -->
     <div class="modal-overlay" id="editStudentModal">
-        <div class="modal-box">
+        <div class="modal-box" style="max-width: 600px;">
             <div class="modal-head">
-                <div class="modal-title">Edit Student</div>
+                <div class="modal-title">Student Information</div>
                 <button class="modal-close" onclick="closeEditStudentModal()" aria-label="Close"><i
                         data-lucide="x"></i></button>
             </div>
             <input type="hidden" id="editStudentId">
-            <div class="form-group">
-                <label class="form-label" for="editStudentName">Student Name</label>
-                <input class="form-input" id="editStudentName" type="text">
+            <input type="hidden" id="editStudentUserId">
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="card" style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);">
+                    <h3 style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.75rem; color: var(--text-2); letter-spacing: 0.05em;">Academic Profile</h3>
+                    <div class="form-group">
+                        <label class="form-label" for="editStudentName">Full Name</label>
+                        <input class="form-input" id="editStudentName" type="text">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="editStudentRoll">Roll Number</label>
+                        <input class="form-input" id="editStudentRoll" type="text">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="editStudentBatch">Batch Year</label>
+                        <input class="form-input" id="editStudentBatch" type="number">
+                    </div>
+                </div>
+
+                <div class="card" style="padding: 1rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);">
+                    <h3 style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.75rem; color: var(--text-2); letter-spacing: 0.05em;">Account Settings</h3>
+                    <div class="form-group">
+                        <label class="form-label" for="editStudentEmail">Institutional Email</label>
+                        <input class="form-input" id="editStudentEmail" type="email">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="editStudentStatus">Account Status</label>
+                        <select class="form-select" id="editStudentStatus">
+                            <option value="approved">Approved / Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="rejected">Suspended / Inactive</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label" for="editStudentRoll">Roll Number</label>
-                <input class="form-input" id="editStudentRoll" type="text">
-            </div>
-            <div class="form-group">
-                <label class="form-label" for="editStudentBatch">Batch Year</label>
-                <input class="form-input" id="editStudentBatch" type="number">
-            </div>
+            
             <div id="editStudentNotice" class="notice"></div>
-            <div style="display:flex;gap:0.625rem;margin-top:1rem;">
+            <div style="display:flex;gap:0.625rem;">
                 <button class="btn btn-ghost" onclick="closeEditStudentModal()" style="flex:1;">Cancel</button>
                 <button class="btn btn-primary" onclick="saveStudentEdit()" id="saveStudentBtn" style="flex:1;">
                     <i data-lucide="save"></i> Save Changes
@@ -1267,7 +1291,7 @@
           <td data-label="Attendance"><span style="font-weight:700;color:${pctColor};">${total > 0 ? pct + '%' : '—'}</span></td>
           <td data-label="Status">${statusBadge}</td>
           <td data-label="Actions" style="display:flex;gap:0.25rem;">
-            <button class="btn btn-ghost btn-sm" onclick="openEditStudentModal(${s.student_id}, '${safeName}', '${safeRoll}', '${safeBatch}')">Edit</button>
+            <button class="btn btn-ghost btn-sm" onclick="openEditStudentModal(${s.student_id}, '${safeName}', '${safeRoll}', '${safeBatch}', '${s.email}', '${s.status}', ${s.user_id})">Edit</button>
             <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeStudent(${s.student_id}, '${safeName}')"><i data-lucide="trash-2"></i> Remove</button>
           </td>
         </tr>`;
@@ -1682,11 +1706,14 @@
             window.executeConfirm = executeConfirm;
 
             /* ── Edit Student & Faculty ── */
-            function openEditStudentModal(id, name, roll, batch) {
+            function openEditStudentModal(id, name, roll, batch, email, status, userId) {
                 document.getElementById('editStudentId').value = id;
+                document.getElementById('editStudentUserId').value = userId;
                 document.getElementById('editStudentName').value = name;
                 document.getElementById('editStudentRoll').value = roll;
                 document.getElementById('editStudentBatch').value = batch;
+                document.getElementById('editStudentEmail').value = email;
+                document.getElementById('editStudentStatus').value = status;
                 document.getElementById('editStudentNotice').className = 'notice';
                 document.getElementById('editStudentModal').classList.add('show');
                 lucide.createIcons();
@@ -1697,7 +1724,9 @@
                 const body = {
                     name: document.getElementById('editStudentName').value.trim(),
                     roll_number: document.getElementById('editStudentRoll').value.trim(),
-                    batch_year: document.getElementById('editStudentBatch').value
+                    batch_year: document.getElementById('editStudentBatch').value,
+                    email: document.getElementById('editStudentEmail').value.trim(),
+                    status: document.getElementById('editStudentStatus').value
                 };
                 const btn = document.getElementById('saveStudentBtn');
                 const notice = document.getElementById('editStudentNotice');

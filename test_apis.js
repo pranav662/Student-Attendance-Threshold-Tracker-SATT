@@ -111,7 +111,7 @@ async function run() {
   check('Admin /pending-teachers (200)', pending.status === 200);
 
   // 13a. Edit Student (Test endpoint existence/auth)
-  const editStu = await req('/api/admin/students/99999', { name: 'Test', roll_number: 'T999', batch_year: 2024 }, 'PUT', adminToken);
+  const editStu = await req('/api/admin/students/99999', { name: 'Test', roll_number: 'T999', batch_year: 2024, email: 'test@example.com', status: 'approved' }, 'PUT', adminToken);
   check('Admin PUT /students/:id (404/200)', editStu.status === 404 || editStu.status === 200);
 
   // 13b. Edit Faculty (Test endpoint existence/auth)
