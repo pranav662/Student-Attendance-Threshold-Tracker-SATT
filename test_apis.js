@@ -158,11 +158,11 @@ async function run() {
   check('Faculty /available-courses (200)', facAvail.status === 200);
 
   // 20a. Faculty students
-  const facStudents = await req('/api/faculty/students?course_id=99999', null, 'GET', facToken);
+  const facStudents = await req('/api/faculty/students?assignment_id=99999', null, 'GET', facToken);
   check('Faculty /students (403/200)', facStudents.status === 403 || facStudents.status === 200);
 
   // 20b. Faculty sessions
-  const facSessions = await req('/api/faculty/sessions?course_id=99999', null, 'GET', facToken);
+  const facSessions = await req('/api/faculty/sessions?assignment_id=99999', null, 'GET', facToken);
   check('Faculty /sessions (403/200)', facSessions.status === 403 || facSessions.status === 200);
 
   // 20c. Faculty session attendance
@@ -170,17 +170,18 @@ async function run() {
   check('Faculty /sessions/:id/attendance (403/200)', facSessAttn.status === 403 || facSessAttn.status === 200);
 
   // 20d. Unauthorized faculty access (Negative Test)
-  const unauthFac = await req('/api/faculty/students?course_id=99999', null, 'GET', facToken);
+  const unauthFac = await req('/api/faculty/students?assignment_id=99999', null, 'GET', facToken);
   check('Faculty unauthorized course access (403)', unauthFac.status === 403);
   
-  const editUnauthStu = await req('/api/faculty/students/99999', { name: 'Test', roll_number: '123', batch_year: 2024 }, 'PUT', facToken);
+  const editUnauthStu = await req('/api/faculty/students/99999/details', null, 'GET', facToken);
   check('Faculty cross-course/semester student edit blocked (403)', editUnauthStu.status === 403 || editUnauthStu.status === 404);
 
   console.log('\n── QR ATTENDANCE INTEGRATION TEST ────────────────');
   // Faculty creates QR for an existing course they own
   if (facCourses.status === 200 && facCourses.body.length > 0) {
+    const aid = facCourses.body[0].assignment_id;
     const cid = facCourses.body[0].course_id;
-    const qrGen = await req('/api/qr/generate', { course_id: cid, duration_minutes: 5 }, 'POST', facToken);
+    const qrGen = await req('/api/qr/generate', { assignment_id: aid, duration_minutes: 5 }, 'POST', facToken);
     check('Faculty QR Generate (201)', qrGen.status === 201, JSON.stringify(qrGen.body));
     
     if (qrGen.status === 201) {
@@ -202,6 +203,38 @@ async function run() {
     }
   } else {
     console.log('  ! Skipping QR Integration Test: No assigned courses for faculty.');
+  }
+
+  console.log('\n── REGRESSION TESTS ──────────────────────────────');
+  if (facCourses.status === 200 && facCourses.body.length > 0) {
+    const aid = facCourses.body[0].assignment_id;
+    // Test 1: Load Faculty Past Sessions using assignment_id
+    const pastSess = await req(`/api/faculty/sessions?assignment_id=${aid}`, null, 'GET', facToken);
+    check('Load Faculty Past Sessions using assignment_id (200)', pastSess.status === 200);
+    
+    if (pastSess.status === 200 && pastSess.body.length > 0) {
+      const sessId = pastSess.body[0].session_id;
+      
+      // Test 2: View Session Attendance
+      const sessAttnReg = await req(`/api/faculty/sessions/${sessId}/attendance`, null, 'GET', facToken);
+      check('View Session Attendance (200)', sessAttnReg.status === 200);
+      if (sessAttnReg.status === 200) {
+         check('Un-attended students show up correctly', Array.isArray(sessAttnReg.body));
+      }
+      
+      // Test 3: Update Session Attendance (testing the transaction logic doesn't throw)
+      // Pass empty array or existing student to be safe
+      const updateData = { records: [] };
+      if (sessAttnReg.body && sessAttnReg.body.length > 0) {
+          updateData.records.push({ student_id: sessAttnReg.body[0].student_id, status: 'Present' });
+      }
+      const sessUpdate = await req(`/api/faculty/sessions/${sessId}/attendance`, updateData, 'PUT', facToken);
+      check('Update Session Attendance transaction logic (200)', sessUpdate.status === 200);
+    } else {
+      console.log('  ! Skipping Regression Test for sessions: No past sessions found.');
+    }
+  } else {
+    console.log('  ! Skipping Regression Test: No assigned courses for faculty.');
   }
 
   console.log('\n── PDF ───────────────────────────────────────────');

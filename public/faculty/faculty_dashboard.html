@@ -68,7 +68,12 @@
     <div class="sidebar-head">
       <div class="brand-lockup">
         <div class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg>
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:24px;height:24px;">
+            <rect width="64" height="64" rx="16" fill="currentColor"/>
+            <path d="M32 16L14 26L32 36L50 26L32 16Z" fill="#ffffff" fill-opacity="0.9"/>
+            <path d="M50 26V40" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M24 44L30 50L44 34" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
         <div class="brand-copy">
           <div class="sidebar-title">SATT</div>
@@ -532,6 +537,13 @@
 (function () {
   'use strict';
   SAMS.initTheme();
+  
+  function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
   if (!SAMS.requireAuth()) return;
 
   const SECTIONS = ['live','manual','courses','students','sessions','assign'];
@@ -661,7 +673,11 @@
     try {
       const res = await SAMS.apiFetch(`/api/faculty/students/${id}/details`);
       const data = await res.json();
-      if (!res.ok) { SAMS.toast(data.error || 'Error fetching details', 'error'); return; }
+      if (!res.ok) { 
+        console.error('API Error:', data.error);
+        SAMS.toast(data.error || 'Error fetching details', 'error'); 
+        return; 
+      }
       
       currentEditingStudent = data.student;
       
@@ -671,33 +687,44 @@
       document.getElementById('dtlBatch').textContent = data.student.batch_year;
       document.getElementById('dtlEmail').textContent = data.student.email || 'N/A';
       
-      document.getElementById('dtlCourses').innerHTML = data.courses.map(c => {
-        const pct = c.total_sessions > 0 ? Math.round((c.present_count / c.total_sessions) * 100) : 0;
-        const cl = pct >= (window.APP_THRESHOLD || 75) ? 'badge-safe' : 'badge-danger';
-        return `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-          <span><strong>${c.course_code}</strong> - ${c.course_name}</span>
-          <span class="badge ${cl}">${pct}%</span>
-        </div>`;
-      }).join('');
+      if (!data.courses || !data.courses.length) {
+        document.getElementById('dtlCourses').innerHTML = `<div style="padding:1rem;text-align:center;color:var(--text-3);">No assigned course data available.</div>`;
+      } else {
+        document.getElementById('dtlCourses').innerHTML = data.courses.map(c => {
+          const pct = c.total_sessions > 0 ? Math.round((c.present_count / c.total_sessions) * 100) : 0;
+          const cl = pct >= (window.APP_THRESHOLD || 75) ? 'badge-safe' : 'badge-danger';
+          return `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+            <span><strong>${escHtml(c.course_code)}</strong> - ${escHtml(c.course_name)}</span>
+            <span class="badge ${cl}">${pct}%</span>
+          </div>`;
+        }).join('');
+      }
       
-      document.getElementById('dtlHistory').innerHTML = data.history.map(h => {
-        const d = new Date(h.session_date).toLocaleDateString();
-        const cl = h.status === 'Present' ? 'badge-safe' : 'badge-danger';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
-          <div style="display:flex;flex-direction:column;gap:0.25rem;">
-            <span style="font-weight:600;">${h.course_code}</span>
-            <span style="font-size:0.75rem;color:var(--text-3);">${d} ${h.start_time}</span>
-          </div>
-          <div style="display:flex;gap:0.5rem;align-items:center;">
-            <span class="badge ${cl}">${h.status}</span>
-            <button class="btn btn-ghost btn-sm" onclick="openCorrectModal(${h.session_id}, ${data.student.student_id}, '${h.status}')"><i data-lucide="edit-3"></i></button>
-          </div>
-        </div>`;
-      }).join('');
+      if (!data.history || !data.history.length) {
+        document.getElementById('dtlHistory').innerHTML = `<div style="padding:1rem;text-align:center;color:var(--text-3);">No attendance history available.</div>`;
+      } else {
+        document.getElementById('dtlHistory').innerHTML = data.history.map(h => {
+          const d = new Date(h.session_date).toLocaleDateString();
+          const cl = h.status === 'Present' ? 'badge-safe' : 'badge-danger';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;flex-direction:column;gap:0.25rem;">
+              <span style="font-weight:600;">${escHtml(h.course_code)}</span>
+              <span style="font-size:0.75rem;color:var(--text-3);">${d} ${escHtml(h.start_time || '')}</span>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center;">
+              <span class="badge ${cl}">${escHtml(h.status)}</span>
+              <button class="btn btn-ghost btn-sm" onclick="openCorrectModal(${h.session_id}, ${data.student.student_id}, '${escHtml(h.status)}')"><i data-lucide="edit-3"></i></button>
+            </div>
+          </div>`;
+        }).join('');
+      }
       
       lucide.createIcons();
       document.getElementById('modalStudentDetails').classList.add('show');
-    } catch { SAMS.toast('Network error', 'error'); }
+    } catch (err) { 
+      console.error(err);
+      SAMS.toast('Network error', 'error'); 
+    }
   }
   window.openStudentDetails = openStudentDetails;
 
@@ -1097,8 +1124,14 @@
     }
     
     try {
-      const res = await SAMS.apiFetch(`/api/faculty/sessions?course_id=${courseId}`);
+      const res = await SAMS.apiFetch(`/api/faculty/sessions?assignment_id=${assignmentId}`);
       const sessions = await res.json();
+      
+      if (!res.ok) {
+        console.error('API Error:', sessions.error);
+        container.innerHTML = `<div class="empty-state"><p>${escHtml(sessions.error) || 'Failed to load sessions.'}</p></div>`;
+        return;
+      }
       
       if (!sessions.length) {
         container.innerHTML = `<div class="empty-state"><div class="ei">📅</div><p>No past sessions found for this course.</p></div>`;
@@ -1141,10 +1174,17 @@
     
     try {
       const res = await SAMS.apiFetch(`/api/faculty/sessions/${sessionId}/attendance`);
-      let records = await res.json(); if (!Array.isArray(records)) records = [];
+      let records = await res.json(); 
+      if (!res.ok) {
+        console.error('API Error:', records.error);
+        if (!silent) container.innerHTML = `<div class="empty-state"><p>${escHtml(records.error) || 'Failed to load session attendance.'}</p></div>`;
+        return;
+      }
+      if (!Array.isArray(records)) records = [];
       sessionStudentData = records;
       renderSessionStudentList(records);
-    } catch {
+    } catch (err) {
+      console.error(err);
       if (!silent) container.innerHTML = `<div class="empty-state"><p>Could not load session attendance.</p></div>`;
     }
   }
@@ -1198,7 +1238,10 @@
   }
 
   async function saveSessionAttendance() {
-    if (!currentSessionId || !sessionStudentData.length) return;
+    if (!currentSessionId || !sessionStudentData.length) {
+      SAMS.toast('Attendance data could not be loaded. Please refresh the session.', 'error');
+      return;
+    }
     
     const records = sessionStudentData.map((s, i) => {
       const chk = document.getElementById('sess_stu_' + i);
@@ -1222,7 +1265,7 @@
       if (res.ok) {
         notice.textContent = '✓ ' + (data.message || 'Attendance updated.');
         notice.className = 'notice show success';
-        setTimeout(() => { notice.className = 'notice'; closeSessionDetails(); }, 1500);
+        setTimeout(() => { notice.className = 'notice'; closeSessionDetails(); loadPastSessions(true); }, 1500);
       } else {
         notice.textContent = data.error || 'Failed to update attendance.';
         notice.className = 'notice show error';
