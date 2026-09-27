@@ -416,6 +416,31 @@ app.put('/api/admin/students/:id', authenticate, requireRole('admin'), async (re
   } catch (error) { return next(error); }
 });
 
+/* ── Delete Student ── */
+app.delete('/api/admin/students/:id', authenticate, requireRole('admin'), async (req, res, next) => {
+  const connection = await pool.getConnection();
+  try {
+    const studentId = parseInt(req.params.id);
+    await connection.beginTransaction();
+    const [students] = await connection.execute('SELECT user_id FROM students WHERE student_id = ? FOR UPDATE', [studentId]);
+    if (!students.length) {
+      await connection.rollback();
+      return fail(res, 404, 'Student not found.');
+    }
+    const userId = students[0].user_id;
+    // FKs use ON DELETE CASCADE for students -> user_id
+    await connection.execute('DELETE FROM users WHERE user_id = ?', [userId]);
+    await connection.commit();
+    auditLog(req.user.sub, 'admin', 'REMOVE_STUDENT', 'student', studentId);
+    return res.json({ message: 'Student removed successfully.' });
+  } catch (error) {
+    await connection.rollback();
+    return next(error);
+  } finally {
+    connection.release();
+  }
+});
+
 /* ── Edit Faculty ── */
 app.put('/api/admin/faculty/:id', authenticate, requireRole('admin'), async (req, res, next) => {
   try {

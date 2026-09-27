@@ -118,6 +118,10 @@ async function run() {
   const editFac = await req('/api/admin/faculty/99999', { name: 'Test', employee_id: 'F999', designation: 'Prof' }, 'PUT', adminToken);
   check('Admin PUT /faculty/:id (404/200)', editFac.status === 404 || editFac.status === 200);
 
+  // 13c. Delete Student (Test endpoint existence/auth)
+  const deleteStu = await req('/api/admin/students/99999', null, 'DELETE', adminToken);
+  check('Admin DELETE /students/:id (404/200)', deleteStu.status === 404 || deleteStu.status === 200);
+
   // 14. Unauthorized test
   const unauth = await req('/api/admin/stats', null, 'GET', stuToken);
   check('Student blocked from admin stats (403)', unauth.status === 403);

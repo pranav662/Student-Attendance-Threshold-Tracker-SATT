@@ -1266,8 +1266,9 @@
           <td data-label="Courses">${s.enrolled_courses}</td>
           <td data-label="Attendance"><span style="font-weight:700;color:${pctColor};">${total > 0 ? pct + '%' : '—'}</span></td>
           <td data-label="Status">${statusBadge}</td>
-          <td data-label="Actions">
+          <td data-label="Actions" style="display:flex;gap:0.25rem;">
             <button class="btn btn-ghost btn-sm" onclick="openEditStudentModal(${s.student_id}, '${safeName}', '${safeRoll}', '${safeBatch}')">Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="removeStudent(${s.student_id}, '${safeName}')"><i data-lucide="trash-2"></i> Remove</button>
           </td>
         </tr>`;
                     }).join('');
@@ -1714,6 +1715,22 @@
             window.openEditStudentModal = openEditStudentModal;
             window.closeEditStudentModal = closeEditStudentModal;
             window.saveStudentEdit = saveStudentEdit;
+
+            window.removeStudent = function(id, name) {
+                showConfirm('Remove Student?', `Are you sure you want to remove "${name}"? This will also delete all their attendance records and history.`, async () => {
+                    try {
+                        const res = await SAMS.apiFetch(`/api/admin/students/${id}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (res.ok) {
+                            SAMS.toast(data.message || 'Student removed', 'success');
+                            loadStudents();
+                            loadStats();
+                        } else {
+                            SAMS.toast(data.error || 'Failed to remove', 'error');
+                        }
+                    } catch { SAMS.toast('Network error', 'error'); }
+                });
+            };
 
             function openEditFacultyModal(id, name, emp, desig) {
                 document.getElementById('editFacultyId').value = id;

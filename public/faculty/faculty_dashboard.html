@@ -377,7 +377,13 @@
           <div class="card" id="sessionDetailsCard" style="display:none;">
             <div class="section-head" style="margin-bottom:0.875rem;">
               <div class="card-title">Session Attendance</div>
-              <button class="btn btn-ghost btn-sm" onclick="closeSessionDetails()">Back to Sessions</button>
+              <div style="display:flex;gap:0.75rem;align-items:center;">
+                <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.875rem;cursor:pointer;">
+                  <input type="checkbox" id="sessionEditModeToggle" onchange="toggleSessionEditMode()">
+                  Edit Mode
+                </label>
+                <button class="btn btn-ghost btn-sm" onclick="closeSessionDetails()">Back</button>
+              </div>
             </div>
             
             <div class="attend-summary" id="sessionAttendSummary">
@@ -390,10 +396,13 @@
 
             <div class="chk-list" id="sessionStudentList"></div>
 
-            <div style="margin-top:1rem;display:flex;gap:0.625rem;align-items:center;">
+            <div class="chk-list" id="sessionStudentList"></div>
+
+            <div id="sessionEditActions" style="margin-top:1rem;display:none;gap:0.625rem;align-items:center;">
               <button class="btn btn-primary" id="saveSessionBtn" onclick="saveSessionAttendance()">
-                <i data-lucide="save"></i> Update Attendance
+                <i data-lucide="save"></i> Save Changes
               </button>
+              <button class="btn btn-ghost" onclick="cancelSessionEdit()">Cancel</button>
             </div>
             <div id="sessionNotice" class="notice"></div>
           </div>
@@ -920,11 +929,18 @@
       `<div class="empty-state"><div class="ei">⏳</div><p>Loading students…</p></div>`;
 
     try {
-      const res  = await SAMS.apiFetch(`/api/faculty/students?course_id=${course_id}`);
+      const res  = await SAMS.apiFetch(`/api/faculty/students?assignment_id=${assignment_id}`);
       const data = await res.json();
+      if (!res.ok) {
+        console.error('API Error:', data.error);
+        document.getElementById('studentList').innerHTML = `<div class="empty-state"><p>${escHtml(data.error) || 'Failed to load students.'}</p></div>`;
+        return;
+      }
       studentData = Array.isArray(data) ? data : [];
       renderStudentList(studentData);
-    } catch {
+    } catch (err) {
+      console.error(err);
+      document.getElementById('studentList').innerHTML = `<div class="empty-state"><p>Could not load students.</p></div>`;
       SAMS.toast('Could not load students.', 'error');
     }
     lucide.createIcons();
@@ -1016,10 +1032,12 @@
         notice.className   = 'notice show success';
         SAMS.toast('Attendance saved!', 'success');
       } else {
+        console.error('API Error:', data.error);
         notice.textContent = data.error || 'Failed to save attendance.';
         notice.className   = 'notice show error';
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       SAMS.toast('Network error.', 'error');
     } finally {
       btn.disabled = false; window.attendanceIsDirty = false;
@@ -1045,7 +1063,7 @@
             <div style="font-weight:600;font-size:0.875rem;color:var(--text-1);">${c.course_name}</div>
             <div style="font-size:0.75rem;color:var(--text-3);font-family:var(--font-mono);">${c.course_code} · ${c.semester || '—'}</div>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="quickMark(${c.course_id})">Mark Now</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickMark(${c.assignment_id})">Mark Now</button>
         </div>`
       ).join('');
     } catch {
@@ -1168,6 +1186,12 @@
     currentSessionId = sessionId;
     document.getElementById('sessionsListCard').style.display = 'none';
     document.getElementById('sessionDetailsCard').style.display = 'block';
+    
+    // Reset Edit Mode
+    window.sessionEditMode = false;
+    document.getElementById('sessionEditModeToggle').checked = false;
+    document.getElementById('sessionEditActions').style.display = 'none';
+    
     const container = document.getElementById('sessionStudentList');
     if (!silent) container.innerHTML = `<div class="empty-state"><div class="ei">⏳</div><p>Loading attendance...</p></div>`;
     window.attendanceIsDirty = false;
@@ -1205,7 +1229,7 @@
       if (isPresent) present++; else absent++;
       return `
         <label class="chk-item">
-          <input type="checkbox" id="sess_stu_${i}" ${isPresent ? 'checked' : ''} onchange="window.attendanceIsDirty = true;">
+          <input type="checkbox" id="sess_stu_${i}" ${isPresent ? 'checked' : ''} ${window.sessionEditMode ? '' : 'disabled'} onchange="window.attendanceIsDirty = true;">
           <div>
             <div class="chk-name">${escHtml(r.name)}</div>
             <div class="chk-roll">${escHtml(r.roll_number)}</div>
@@ -1237,6 +1261,21 @@
     sessionStudentData = [];
   }
 
+  window.toggleSessionEditMode = function() {
+    window.sessionEditMode = document.getElementById('sessionEditModeToggle').checked;
+    document.getElementById('sessionEditActions').style.display = window.sessionEditMode ? 'flex' : 'none';
+    renderSessionStudentList(sessionStudentData);
+  };
+
+  window.cancelSessionEdit = function() {
+    window.sessionEditMode = false;
+    document.getElementById('sessionEditModeToggle').checked = false;
+    document.getElementById('sessionEditActions').style.display = 'none';
+    window.attendanceIsDirty = false;
+    // Reload original data
+    if (currentSessionId) loadSessionAttendance(currentSessionId, true);
+  };
+
   async function saveSessionAttendance() {
     if (!currentSessionId || !sessionStudentData.length) {
       SAMS.toast('Attendance data could not be loaded. Please refresh the session.', 'error');
@@ -1265,7 +1304,14 @@
       if (res.ok) {
         notice.textContent = '✓ ' + (data.message || 'Attendance updated.');
         notice.className = 'notice show success';
-        setTimeout(() => { notice.className = 'notice'; closeSessionDetails(); loadPastSessions(true); }, 1500);
+        setTimeout(() => { 
+          notice.className = 'notice'; 
+          // Instead of closing session details, let's keep it open but exit Edit mode
+          window.sessionEditMode = false;
+          document.getElementById('sessionEditModeToggle').checked = false;
+          document.getElementById('sessionEditActions').style.display = 'none';
+          loadSessionAttendance(currentSessionId, true);
+        }, 1500);
       } else {
         notice.textContent = data.error || 'Failed to update attendance.';
         notice.className = 'notice show error';
