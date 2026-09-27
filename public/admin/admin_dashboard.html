@@ -1078,6 +1078,20 @@
         </div>
     </div>
 
+    <!-- ── Audit Log Detail Modal ── -->
+    <div class="modal-overlay" id="auditDetailModal">
+        <div class="modal-box" style="max-width:600px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-head">
+                <div class="modal-title">Audit Log Details</div>
+                <button class="modal-close" onclick="closeAuditDetailModal()" aria-label="Close"><i data-lucide="x"></i></button>
+            </div>
+            <div id="auditDetailContent" style="margin-top:1rem; overflow-y:auto; flex: 1;"></div>
+            <div style="display:flex;justify-content:flex-end;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
+                <button class="btn btn-ghost" onclick="closeAuditDetailModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/app.js"></script>
     <script>
         (function () {
@@ -1663,6 +1677,39 @@
             let auditSearchTimer;
             window.debouncedAuditSearch = () => { clearTimeout(auditSearchTimer); auditSearchTimer = setTimeout(() => { auditPage = 1; loadAuditLogs(); }, 400); };
 
+            window.viewAuditDetail = function(encodedDetail) {
+                try {
+                    const decoded = decodeURIComponent(encodedDetail);
+                    let parsed = decoded;
+                    
+                    try {
+                        parsed = JSON.parse(decoded);
+                        if (typeof parsed === 'string') {
+                            try { parsed = JSON.parse(parsed); } catch (e) {}
+                        }
+                    } catch (e) {
+                        // Keep as string if parsing fails
+                    }
+                    
+                    let contentHtml = '';
+                    if (typeof parsed === 'object' && parsed !== null) {
+                        contentHtml = `<pre style="font-family:var(--font-mono);font-size:0.85rem;background:var(--surface);padding:1rem;border-radius:var(--r-md);border:1px solid var(--border);white-space:pre-wrap;word-wrap:break-word;">${escHtml(JSON.stringify(parsed, null, 2))}</pre>`;
+                    } else {
+                        contentHtml = `<div style="padding:1rem;background:var(--surface);border-radius:var(--r-md);border:1px solid var(--border);font-size:0.9rem;white-space:pre-wrap;word-wrap:break-word;">${escHtml(String(parsed))}</div>`;
+                    }
+                    
+                    document.getElementById('auditDetailContent').innerHTML = contentHtml;
+                    document.getElementById('auditDetailModal').classList.add('show');
+                } catch (err) {
+                    console.error(err);
+                    SAMS.toast('Error decoding audit details', 'error');
+                }
+            };
+
+            window.closeAuditDetailModal = function() {
+                document.getElementById('auditDetailModal').classList.remove('show');
+            };
+
             /* ── Settings ── */
             async function loadSettings() {
                 try {
@@ -1848,6 +1895,19 @@
                     return detail;
                 }
             }
+
+            /* ── Global Modal Close Handlers ── */
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+                }
+            });
+
+            window.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal-overlay')) {
+                    e.target.classList.remove('show');
+                }
+            });
 
             /* ── Init ── */
             loadUser();

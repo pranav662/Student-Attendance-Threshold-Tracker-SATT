@@ -1698,15 +1698,14 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
 
     // Table header
     const colDefs = [
-      { label: 'CODE',       w: 55 },
-      { label: 'COURSE NAME',w: 150 },
-      { label: 'TOTAL',      w: 45 },
+      { label: 'CODE',       w: 65 },
+      { label: 'COURSE NAME',w: 190 },
+      { label: 'TOTAL',      w: 42 },
       { label: 'PRESENT',    w: 50 },
       { label: 'ABSENT',     w: 45 },
-      { label: 'ATTENDANCE', w: 65 },
-      { label: 'STATUS',     w: 85 },
+      { label: 'ATTENDANCE', w: 55 },
+      { label: 'STATUS',     w: 48 },
     ];
-    const rowH = 18;
     const headerH = 20;
 
     const drawTableHeader = (yPos) => {
@@ -1729,15 +1728,11 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
       y += 30;
     } else {
       coursesData.forEach((c, i) => {
-        if (y > 740) {
-          doc.addPage();
-          y = 50;
-          y = drawTableHeader(y);
-        }
-        if (i % 2 === 0) doc.rect(50, y, PAGE_W, rowH).fill(BG_LIGHT);
+        doc.fontSize(8);
+        doc.font('Helvetica');
         const pctColor = c.percentage >= threshold ? SUCCESS : DANGER;
         const statusLabel = { safe: 'Safe', near_threshold: 'Near Threshold', at_risk: 'At Risk', critical: 'Critical', no_classes: 'No Data' }[c.status] || c.status;
-        let cx = 54;
+        
         const cells = [
           [c.course_code, colDefs[0].w, '#1A2332'],
           [c.course_name, colDefs[1].w, '#1A2332'],
@@ -1747,11 +1742,29 @@ app.get('/api/student/report/pdf', authenticate, requireRole('student'), async (
           [c.percentage + '%', colDefs[5].w, pctColor],
           [statusLabel,   colDefs[6].w, pctColor],
         ];
-        doc.fontSize(8);
+
+        let rowH = 18;
+        cells.forEach(([text, w]) => {
+          const h = doc.heightOfString(String(text), { width: w - 4 }) + 10;
+          if (h > rowH) rowH = h;
+        });
+
+        if (y + rowH > 770) {
+          doc.addPage();
+          y = 50;
+          y = drawTableHeader(y);
+          doc.fontSize(8);
+          doc.font('Helvetica');
+        }
+
+        if (i % 2 === 0) doc.rect(50, y, PAGE_W, rowH).fill(BG_LIGHT);
+        
+        let cx = 54;
         cells.forEach(([text, w, color]) => {
-          doc.font('Helvetica').fillColor(color).text(String(text), cx, y + 5, { width: w - 4, ellipsis: true });
+          doc.fillColor(color).text(String(text), cx, y + 5, { width: w - 4 });
           cx += w;
         });
+        
         // Row border
         doc.moveTo(50, y + rowH).lineTo(545, y + rowH).strokeColor(BORDER).lineWidth(0.5).stroke();
         y += rowH;
